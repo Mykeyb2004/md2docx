@@ -1,0 +1,73 @@
+# Default style configuration for md2docx
+
+# Document-level settings
+document:
+  page_size: A4
+  margin_top: 2.54cm
+  margin_bottom: 2.54cm
+  margin_left: 3.17cm
+  margin_right: 3.17cm
+  line_spacing: 1.5
+
+# Heading styles (levels 1-4)
+heading1:
+  font_name: "微软雅黑"
+  font_size: 18pt
+  font_color: "#000080"  # Dark blue
+  bold: true
+  space_before: 12pt
+  space_after: 6pt
+  alignment: left
+
+heading2:
+  font_name: "微软雅黑"
+  font_size: 16pt
+  font_color: "#000000"
+  bold: true
+  space_before: 10pt
+  space_after: 5pt
+  alignment: left
+
+heading3:
+  font_name: "微软雅黑"
+  font_size: 14pt
+  font_color: "#000000"
+  bold: true
+  space_before: 8pt
+  space_after: 4pt
+  alignment: left
+
+heading4:
+  font_name: "微软雅黑"
+  font_size: 12pt
+  font_color: "#000000"
+  bold: true
+  space_before: 6pt
+  space_after: 3pt
+  alignment: left
+
+# Paragraph style
+paragraph:
+  font_name: "仿宋"
+  font_size: 12pt
+  line_spacing: 1.5
+  first_line_indent: 2  # characters (中文规范：首行缩进2个字符)
+  alignment: justify  # left, right, center, justify
+
+# Table style
+table:
+  style: "Light Grid Accent 1"
+  font_size: 11pt
+  header_bold: true
+  header_background: "#F2F2F2"
+  border_color: "#CCCCCC"
+  alignment: left
+
+# List style
+list:
+  font_name: "仿宋"
+  font_size: 12pt
+  bullet_char: "•"
+  number_format: "1."
+  indent_size: 0.5in
+  space_after: 3pt
