@@ -165,4 +165,20 @@ class StyleManager:
             Style configuration dictionary
         """
         return self.config.get("document", self.DEFAULT_CONFIG.get("document", {}))
-
+    
+    def get_inline_style(self, style_type: str = None) -> Dict[str, Any]:
+        """
+        Get inline text formatting style configuration.
+        
+        Args:
+            style_type: Type of inline style ('bold', 'italic', 'code'), or None for all
+            
+        Returns:
+            Style configuration dictionary
+        """
+        inline_config = self.config.get("inline", {})
+        
+        if style_type:
+            return inline_config.get(style_type, {})
+        
+        return inline_config

@@ -1,221 +1,377 @@
-# md2docx 样式配置参数完整说明
+# md2docx 样式配置完整指南
 
-## 📋 配置文件概述
+> **版本**: v1.0  
+> **最后更新**: 2025-11-20
 
-`md2docx` 使用 YAML 格式的配置文件来定义 Word 文档的所有样式。配置文件包含以下几个主要部分：
+## 📋 目录
 
-1. **document** - 文档级别设置
-2. **heading1-4** - 标题样式（1-4级）
-3. **paragraph** - 段落样式
-4. **table** - 表格样式
-5. **list** - 列表样式
+1. [配置文件概述](#配置文件概述)
+2. [配置节说明](#配置节说明)
+3. [参数速查表](#参数速查表)
+4. [单位与字号对照](#单位与字号对照)
+5. [颜色代码](#颜色代码)
+6. [完整配置示例](#完整配置示例)
+7. [使用方法](#使用方法)
 
 ---
 
-## 🔧 详细参数说明
+## 配置文件概述
 
-### 1. document（文档级别设置）
+`md2docx` 使用 **YAML 格式**的配置文件定义 Word 文档样式。配置文件包含以下 7 个配置节：
 
-控制整个 Word 文档的页面设置。
+| 配置节 | 说明 | 必需 |
+|:------|:-----|:----:|
+| `document` | 文档级设置（页面、边距） | ✅ |
+| `heading1-4` | 标题样式（1-4级） | ✅ |
+| `paragraph` | 段落样式 | ✅ |
+| `inline` | 行内文本样式（粗体、斜体、代码） | ⭕ |
+| `table` | 表格样式 | ⭕ |
+| `list` | 列表样式 | ⭕ |
 
-| 参数 | 类型 | 说明 | 默认值 | 示例 |
-|------|------|------|--------|------|
-| `page_size` | 字符串 | 页面大小 | `A4` | `A4`, `Letter`, `A3` |
-| `margin_top` | 字符串 | 上边距 | `2.54cm` | `2.54cm`, `1in` |
-| `margin_bottom` | 字符串 | 下边距 | `2.54cm` | `2.54cm`, `1in` |
-| `margin_left` | 字符串 | 左边距 | `3.17cm` | `3.17cm`, `1.25in` |
-| `margin_right` | 字符串 | 右边距 | `3.17cm` | `3.17cm`, `1.25in` |
-| `line_spacing` | 数字 | 行距倍数 | `1.5` | `1.0`, `1.5`, `2.0` |
+---
 
-**示例：**
+## 配置节说明
+
+### 1️⃣ document - 文档设置
+
+控制整个 Word 文档的页面布局。
+
 ```yaml
 document:
-  page_size: A4
-  margin_top: 2.54cm
-  margin_bottom: 2.54cm
-  margin_left: 3.17cm
-  margin_right: 3.17cm
-  line_spacing: 1.5
+  page_size: A4           # 页面大小
+  margin_top: 2.54cm      # 上边距
+  margin_bottom: 2.54cm   # 下边距
+  margin_left: 3.17cm     # 左边距
+  margin_right: 3.17cm    # 右边距
+  line_spacing: 1.5       # 默认行距倍数
 ```
+
+**参数说明**：
+
+| 参数 | 类型 | 默认值 | 可选值 | 说明 |
+|:-----|:----:|:-------|:-------|:-----|
+| `page_size` | 字符串 | `A4` | `A4`, `A3`, `Letter` | 纸张大小 |
+| `margin_top/bottom/left/right` | 字符串 | `2.54cm` | 任意尺寸 + 单位 | 页边距 |
+| `line_spacing` | 数字 | `1.5` | `1.0`, `1.5`, `2.0` | 行距倍数 |
 
 ---
 
-### 2. heading1-4（标题样式）
+### 2️⃣ heading1-4 - 标题样式
 
-定义 1-4 级标题的样式。每个级别支持相同的参数。
+定义 1-4 级标题的样式（所有标题支持相同参数）。
 
-| 参数 | 类型 | 说明 | 示例 | 备注 |
-|------|------|------|------|------|
-| `font_name` | 字符串 | 字体名称 | `"微软雅黑"`, `"仿宋"` | 使用系统已安装的字体 |
-| `font_size` | 字符串 | 字体大小 | `18pt`, `16pt`, `14pt` | 使用 `pt`（磅）单位 |
-| `font_color` | 字符串 | 字体颜色 | `"#000080"`, `"#000000"` | 十六进制颜色代码 |
-| `bold` | 布尔值 | 是否加粗 | `true`, `false` | 标题通常设为 `true` |
-| `space_before` | 字符串 | 段前间距 | `12pt`, `10pt` | 使用 `pt` 单位 |
-| `space_after` | 字符串 | 段后间距 | `6pt`, `5pt` | 使用 `pt` 单位 |
-| `alignment` | 字符串 | 对齐方式 | `left`, `center`, `right` | 标题通常为 `left` |
-
-**示例：**
 ```yaml
 heading1:
-  font_name: "微软雅黑"
-  font_size: 18pt
-  font_color: "#000080"  # 深蓝色
-  bold: true
-  space_before: 12pt
-  space_after: 6pt
-  alignment: left
-
-heading2:
-  font_name: "微软雅黑"
-  font_size: 16pt
-  font_color: "#000000"  # 黑色
-  bold: true
-  space_before: 10pt
-  space_after: 5pt
-  alignment: left
+  font_name: "方正小标宋简体"  # 字体
+  font_size: 22pt             # 字号
+  font_color: "#000080"       # 颜色
+  bold: true                  # 加粗
+  italic: false               # 斜体
+  space_before: 6pt           # 段前间距
+  space_after: 6pt            # 段后间距
+  alignment: center           # 对齐方式
+  first_line_indent: 0        # 首行缩进（字符数）
 ```
+
+**参数说明**：
+
+| 参数 | 类型 | 默认值 | 可选值 | 说明 |
+|:-----|:----:|:-------|:-------|:-----|
+| `font_name` | 字符串 | `"微软雅黑"` | 任意已安装字体 | 字体名称 |
+| `font_size` | 字符串 | `18pt` | `12pt`-`42pt` | 字号（见字号对照表） |
+| `font_color` | 字符串 | `"#000000"` | 十六进制颜色 | 文字颜色 |
+| `bold` | 布尔值 | `true` | `true`/`false` | 是否加粗 |
+| `italic` | 布尔值 | `false` | `true`/`false` | 是否斜体 |
+| `space_before` | 字符串 | `12pt` | 任意尺寸 + `pt` | 段前间距 |
+| `space_after` | 字符串 | `6pt` | 任意尺寸 + `pt` | 段后间距 |
+| `alignment` | 字符串 | `left` | `left`, `center`, `right` | 对齐方式 |
+| `first_line_indent` | 数字 | `0` | `0`, `2`, `4` | 首行缩进字符数 |
+
+**各级标题推荐配置**：
+
+| 标题级别 | 推荐字体 | 推荐字号 | 推荐样式 |
+|:-----:|:--------|:--------|:--------|
+| heading1 | 方正小标宋/黑体 | 22pt (二号) | 加粗、居中 |
+| heading2 | 黑体 | 16pt (三号) | 加粗、左对齐 |
+| heading3 | 楷体 | 16pt (三号) | 加粗、左对齐 |
+| heading4 | 仿宋 | 12pt (小四) | 普通、左对齐 |
 
 ---
 
-### 3. paragraph（段落样式）
+### 3️⃣ paragraph - 段落样式
 
 定义普通段落的样式。
 
-| 参数 | 类型 | 说明 | 默认值 | 可选值/示例 |
-|------|------|------|--------|------------|
-| `font_name` | 字符串 | 字体名称 | `"仿宋"` | `"宋体"`, `"仿宋"`, `"楷体"` |
-| `font_size` | 字符串 | 字体大小 | `12pt` | `10pt`, `11pt`, `12pt`, `14pt` |
-| `line_spacing` | 数字 | 行距倍数 | `1.5` | `1.0`, `1.15`, `1.5`, `2.0` |
-| `first_line_indent` | 数字 | 首行缩进字符数 | `2` | `0`, `2`, `4` |
-| `alignment` | 字符串 | 对齐方式 | `justify` | `left`, `right`, `center`, `justify` |
+```yaml
+paragraph:
+  font_name: "仿宋"           # 字体
+  font_size: 12pt             # 字号
+  line_spacing: 1.5           # 行距倍数
+  first_line_indent: 2        # 首行缩进（字符数）
+  alignment: justify          # 对齐方式
+  space_before: 0pt           # 段前间距
+  space_after: 0pt            # 段后间距
+```
 
-**首行缩进说明：**
-- `0` = 无缩进
-- `2` = 缩进2个字符（中文规范）
-- 实际缩进 = 字符数 × 字体大小
+**参数说明**：
 
-**对齐方式说明：**
+| 参数 | 类型 | 默认值 | 可选值 | 说明 |
+|:-----|:----:|:-------|:-------|:-----|
+| `font_name` | 字符串 | `"仿宋"` | 任意已安装字体 | 字体名称 |
+| `font_size` | 字符串 | `12pt` | `10pt`-`14pt` | 字号 |
+| `line_spacing` | 数字 | `1.5` | `1.0`-`2.0` | 行距倍数 |
+| `first_line_indent` | 数字 | `2` | `0`, `2`, `4` | 首行缩进字符数 |
+| `alignment` | 字符串 | `justify` | `left`, `right`, `center`, `justify` | 对齐方式 |
+| `space_before` | 字符串 | `0pt` | 任意尺寸 + `pt` | 段前间距 |
+| `space_after` | 字符串 | `0pt` | 任意尺寸 + `pt` | 段后间距 |
+
+**对齐方式说明**：
 - `left` - 左对齐
 - `right` - 右对齐
 - `center` - 居中
-- `justify` - 两端对齐（推荐用于段落）
+- `justify` - 两端对齐（推荐用于正文）
 
-**示例：**
-```yaml
-paragraph:
-  font_name: "仿宋"
-  font_size: 12pt
-  line_spacing: 1.5
-  first_line_indent: 2  # 首行缩进2个字符
-  alignment: justify
-```
+**首行缩进说明**：
+- `0` = 无缩进
+- `2` = 缩进2个字符（中文规范）
+- 实际缩进宽度 = 字符数 × 字体大小
 
 ---
 
-### 4. table（表格样式）
+### 4️⃣ inline - 行内文本样式
+
+定义 Markdown 行内强调文本的样式。
+
+```yaml
+inline:
+  # 粗体 (**text**)
+  bold:
+    font_color: null  # null=继承父级，或指定颜色
+  
+  # 斜体 (*text*)
+  italic:
+    font_color: null
+  
+  # 行内代码 (`code`)
+  code:
+    font_name: "Consolas"
+    font_size: 11pt
+    font_color: "#D14"
+    background: "#F5F5F5"
+```
+
+**参数说明**：
+
+| 子节.参数 | 类型 | 默认值 | 说明 |
+|:---------|:----:|:-------|:-----|
+| `bold.font_color` | 字符串/null | `null` | 粗体文本颜色（null=继承） |
+| `italic.font_color` | 字符串/null | `null` | 斜体文本颜色（null=继承） |
+| `code.font_name` | 字符串 | `"Consolas"` | 代码字体（等宽字体） |
+| `code.font_size` | 字符串 | `11pt` | 代码字号 |
+| `code.font_color` | 字符串 | `"#D14"` | 代码文字颜色 |
+| `code.background` | 字符串 | `"#F5F5F5"` | 代码背景颜色 |
+
+**Markdown 语法对应**：
+- `**粗体**` 或 `__粗体__` → `inline.bold`
+- `*斜体*` 或 `_斜体_` → `inline.italic`
+- `` `代码` `` → `inline.code`
+
+---
+
+### 5️⃣ table - 表格样式
 
 定义表格的样式。
 
-| 参数 | 类型 | 说明 | 默认值 | 可选值/示例 |
-|------|------|------|--------|------------|
-| `style` | 字符串 | Word 内置表格样式 | `"Light Grid Accent 1"` | 见下方样式列表 |
-| `font_name` | 字符串 | 表格字体 | `"宋体"` | 任意已安装字体 |
-| `font_size` | 字符串 | 字体大小 | `11pt` | `9pt`, `10pt`, `11pt`, `12pt` |
-| `header_bold` | 布尔值 | 表头是否加粗 | `true` | `true`, `false` |
-| `header_background` | 字符串 | 表头背景色 | `"#F2F2F2"` | 十六进制颜色代码 |
-| `border_color` | 字符串 | 边框颜色 | `"#CCCCCC"` | 十六进制颜色代码 |
-| `alignment` | 字符串 | 单元格对齐 | `left` | `left`, `center`, `right` |
-
-**Word 内置表格样式列表：**
-- `"Light Grid Accent 1"` - 浅色网格（推荐）
-- `"Medium Shading 1 Accent 1"` - 中等阴影
-- `"Light List Accent 1"` - 浅色列表
-- `"Table Grid"` - 简单网格
-- `None` - 无样式
-
-**示例：**
 ```yaml
 table:
-  style: "Light Grid Accent 1"
-  font_name: "宋体"
-  font_size: 11pt
-  header_bold: true
-  header_background: "#F2F2F2"  # 浅灰色
-  border_color: "#CCCCCC"
-  alignment: left
+  style: "Light Grid Accent 1"  # Word 内置表格样式
+  font_name: "仿宋"              # 字体
+  font_size: 12pt                # 字号
+  line_spacing: 1.5              # 行距
+  header_bold: true              # 表头加粗
+  header_background: "#F2F2F2"   # 表头背景色
+  border_color: "#CCCCCC"        # 边框颜色
+  alignment: left                # 默认对齐（可被Markdown对齐语法覆盖）
+  
+  # 斑马纹（可选）
+  alternating_rows: false        # 是否启用交替行颜色
+  row_background_odd: "#FFFFFF"  # 奇数行背景
+  row_background_even: "#F9F9F9" # 偶数行背景
 ```
+
+**参数说明**：
+
+| 参数 | 类型 | 默认值 | 可选值 | 说明 |
+|:-----|:----:|:-------|:-------|:-----|
+| `style` | 字符串 | `"Light Grid Accent 1"` | Word 内置样式名 | 表格样式 |
+| `font_name` | 字符串 | `"仿宋"` | 任意已安装字体 | 表格字体 |
+| `font_size` | 字符串 | `12pt` | `9pt`-`14pt` | 字号 |
+| `line_spacing` | 数字 | `1.5` | `1.0`-`2.0` | 行距 |
+| `header_bold` | 布尔值 | `true` | `true`/`false` | 表头是否加粗 |
+| `header_background` | 字符串 | `"#F2F2F2"` | 十六进制颜色 | 表头背景色 |
+| `border_color` | 字符串 | `"#CCCCCC"` | 十六进制颜色 | 边框颜色 |
+| `alignment` | 字符串 | `left` | `left`, `center`, `right` | 默认对齐 |
+| `alternating_rows` | 布尔值 | `false` | `true`/`false` | 启用斑马纹 |
+| `row_background_odd` | 字符串 | `"#FFFFFF"` | 十六进制颜色 | 奇数行背景 |
+| `row_background_even` | 字符串 | `"#F9F9F9"` | 十六进制颜色 | 偶数行背景 |
+
+**表格对齐说明**：
+
+md2docx 完全支持 Markdown 表格对齐语法：
+
+| Markdown 语法 | 效果 |
+|:-------------|:-----|
+| `\| :--- \|` | 左对齐 |
+| `\| :--: \|` | 居中 |
+| `\| ---: \|` | 右对齐 |
+| `\| --- \|` | 默认对齐 |
+
+**Word 内置表格样式**：
+- `"Light Grid Accent 1"` - 浅色网格（推荐）
+- `"Table Grid"` - 简单网格
+- `"Medium Shading 1 Accent 1"` - 中等阴影
+- `None` - 无样式
 
 ---
 
-### 5. list（列表样式）
+### 6️⃣ list - 列表样式
 
 定义有序和无序列表的样式。
 
-| 参数 | 类型 | 说明 | 默认值 | 可选值/示例 |
-|------|------|------|--------|------------|
-| `font_name` | 字符串 | 列表字体 | `"仿宋"` | 任意已安装字体 |
-| `font_size` | 字符串 | 字体大小 | `12pt` | `10pt`, `11pt`, `12pt` |
-| `bullet_char` | 字符串 | 无序列表符号 | `"•"` | `"•"`, `"-"`, `"■"`, `"○"` |
-| `number_format` | 字符串 | 有序列表格式 | `"1."` | `"1."`, `"1)"`, `"(1)"` |
-| `indent_size` | 字符串 | 每级缩进 | `0.5in` | `0.5in`, `1cm`, `0.75in` |
-| `space_after` | 字符串 | 列表项后间距 | `3pt` | `2pt`, `3pt`, `6pt` |
-
-**示例：**
 ```yaml
 list:
-  font_name: "仿宋"
-  font_size: 12pt
-  bullet_char: "•"
-  number_format: "1."
-  indent_size: 0.5in
-  space_after: 3pt
+  font_name: "仿宋"    # 字体
+  font_size: 12pt      # 字号
+  bullet_char: "•"     # 无序列表符号
+  number_format: "1."  # 有序列表格式
+  indent_size: 0.5in   # 每级缩进
+  space_after: 3pt     # 列表项后间距
 ```
+
+**参数说明**：
+
+| 参数 | 类型 | 默认值 | 可选值 | 说明 |
+|:-----|:----:|:-------|:-------|:-----|
+| `font_name` | 字符串 | `"仿宋"` | 任意已安装字体 | 列表字体 |
+| `font_size` | 字符串 | `12pt` | `10pt`-`14pt` | 字号 |
+| `bullet_char` | 字符串 | `"•"` | `"•"`, `"-"`, `"■"`, `"○"` | 无序列表符号 |
+| `number_format` | 字符串 | `"1."` | `"1."`, `"1)"`, `"(1)"` | 有序列表格式 |
+| `indent_size` | 字符串 | `0.5in` | 任意尺寸 + 单位 | 每级缩进大小 |
+| `space_after` | 字符串 | `3pt` | 任意尺寸 + `pt` | 列表项后间距 |
 
 ---
 
-## 📐 单位说明
+## 参数速查表
 
-配置文件支持以下计量单位：
+### 通用参数
+
+| 参数名 | 适用配置节 | 类型 | 说明 |
+|:------|:----------|:----:|:-----|
+| `font_name` | heading, paragraph, table, list | 字符串 | 字体名称 |
+| `font_size` | heading, paragraph, inline.code, table, list | 字符串 | 字号（需带单位） |
+| `font_color` | heading, inline.bold/italic/code | 字符串 | 文字颜色 |
+| `bold` | heading | 布尔值 | 是否加粗 |
+| `italic` | heading | 布尔值 | 是否斜体 |
+| `alignment` | heading, paragraph, table | 字符串 | 对齐方式 |
+| `line_spacing` | document, paragraph, table | 数字 | 行距倍数 |
+| `space_before` | heading, paragraph | 字符串 | 段前间距 |
+| `space_after` | heading, paragraph, list | 字符串 | 段后间距 |
+| `first_line_indent` | heading, paragraph | 数字 | 首行缩进字符数 |
+
+---
+
+## 单位与字号对照
+
+### 支持的单位
 
 | 单位 | 说明 | 示例 | 转换 |
-|------|------|------|------|
+|:----:|:-----|:-----|:-----|
 | `pt` | 磅（Points） | `12pt` | 1pt = 1/72英寸 |
-| `cm` | 厘米 | `2.54cm` | 1cm = 0.394英寸 |
-| `in` | 英寸 | `1in` | 1in = 2.54cm |
+| `cm` | 厘米 | `2.54cm` | 1cm ≈ 28.35pt |
+| `in` | 英寸 | `1in` | 1in = 72pt = 2.54cm |
 | `mm` | 毫米 | `25.4mm` | 10mm = 1cm |
 
-**常用字号对照：**
-- 10pt = 五号
-- 12pt = 小四
-- 14pt = 四号
-- 16pt = 三号
-- 18pt = 二号
+### 中文字号对照表
 
----
+| 中文字号 | 磅值（pt） | 使用场景 | 推荐用途 |
+|:--------:|:---------:|:---------|:---------|
+| **初号** | 42pt | 封面大标题 | - |
+| **小初号** | 36pt | 重要标题 | heading1（特大） |
+| **一号** | 26pt | 章节大标题 | heading1 |
+| **小一号** | 24pt | 章节标题 | heading1 |
+| **二号** | 22pt | 副标题 | **heading1（推荐）** ⭐ |
+| **小二号** | 18pt | 一级标题 | **heading2** ⭐ |
+| **三号** | 16pt | 二级标题 | **heading2/3（推荐）** ⭐ |
+| **小三号** | 15pt | 强调标题 | heading3 |
+| **四号** | 14pt | 三级标题 | **heading3/4** ⭐ |
+| **小四号** | 12pt | 正文 | **paragraph（最常用）** ⭐ |
+| **五号** | 10.5pt | 小字正文 | 注释 |
+| **小五号** | 9pt | 脚注 | table, 图表说明 |
+| **六号** | 7.5pt | 页眉页脚 | - |
+| **小六号** | 6.5pt | 小字备注 | - |
+| **七号** | 5.5pt | 极小字 | - |
+| **八号** | 5pt | 最小字号 | - |
 
-## 🎨 颜色代码
+### 推荐字号配置
 
-颜色使用十六进制代码表示，格式为 `"#RRGGBB"`。
-
-**常用颜色：**
 ```yaml
-"#000000"  # 黑色
-"#FFFFFF"  # 白色
-"#FF0000"  # 红色
-"#00FF00"  # 绿色
-"#0000FF"  # 蓝色
-"#000080"  # 深蓝色
-"#808080"  # 灰色
-"#F2F2F2"  # 浅灰色
-"#CCCCCC"  # 中灰色
+# 学术文档推荐
+heading1: 22pt  # 二号
+heading2: 18pt  # 小二号
+heading3: 16pt  # 三号
+heading4: 14pt  # 四号
+paragraph: 12pt # 小四号
+
+# 商务报告推荐
+heading1: 18pt  # 小二号
+heading2: 16pt  # 三号
+heading3: 14pt  # 四号
+heading4: 12pt  # 小四号（加粗）
+paragraph: 12pt # 小四号
 ```
 
 ---
 
-## 📝 完整配置示例
+## 颜色代码
+
+颜色使用十六进制代码，格式为 `"#RRGGBB"`。
+
+### 常用颜色
+
+| 颜色 | 代码 | 适用场景 |
+|:-----|:-----|:---------|
+| 黑色 | `"#000000"` | 正文、标题 |
+| 白色 | `"#FFFFFF"` | 背景 |
+| 深蓝色 | `"#000080"` | 重要标题 |
+| 红色 | `"#FF0000"` | 强调、警告 |
+| 深红色 | `"#D14"` | 行内代码 |
+| 深灰色 | `"#333333"` | 次要文字 |
+| 灰色 | `"#808080"` | 辅助文字 |
+| 浅灰色 | `"#F2F2F2"` | 表头背景 |
+| 极浅灰 | `"#F5F5F5"` | 代码背景 |
+| 浅灰边框 | `"#CCCCCC"` | 表格边框 |
+| 米色 | `"#F9F9F9"` | 斑马纹 |
+
+### 中文推荐字体
+
+| 字体名称 | 适用场景 | 特点 |
+|:--------|:---------|:-----|
+| **仿宋** | 正文、段落 | 中文正式文档标准字体 ✅ |
+| **宋体** | 正文、表格 | 传统正文字体 |
+| **黑体** | 标题 | 醒目、现代 |
+| **楷体** | 标题、强调 | 传统、优雅 |
+| **微软雅黑** | 标题 | 现代、清晰 |
+| **方正小标宋** | 一级标题 | 正式文档标题专用字体 ⭐ |
+| **Consolas** | 代码 | 等宽字体（英文） |
+| **Courier New** | 代码 | 等宽字体（备选） |
+
+---
+
+## 完整配置示例
+
+### 示例1：学术论文样式
 
 ```yaml
-# 文档设置
 document:
   page_size: A4
   margin_top: 2.54cm
@@ -224,35 +380,70 @@ document:
   margin_right: 3.17cm
   line_spacing: 1.5
 
-# 一级标题
 heading1:
-  font_name: "微软雅黑"
-  font_size: 18pt
+  font_name: "方正小标宋简体"
+  font_size: 22pt  # 二号
   font_color: "#000080"
   bold: true
-  space_before: 12pt
+  space_before: 6pt
   space_after: 6pt
-  alignment: left
+  alignment: center
 
-# 段落
+heading2:
+  font_name: "黑体"
+  font_size: 16pt  # 三号
+  bold: true
+  space_before: 10pt
+  space_after: 10pt
+  alignment: left
+  first_line_indent: 2
+
+heading3:
+  font_name: "楷体"
+  font_size: 16pt  # 三号
+  bold: true
+  space_before: 8pt
+  space_after: 8pt
+  alignment: left
+  first_line_indent: 2
+
+heading4:
+  font_name: "仿宋"
+  font_size: 12pt  # 小四
+  space_before: 3pt
+  space_after: 3pt
+  alignment: left
+  first_line_indent: 2
+
 paragraph:
   font_name: "仿宋"
-  font_size: 12pt
+  font_size: 12pt  # 小四
   line_spacing: 1.5
   first_line_indent: 2
   alignment: justify
+  space_before: 0pt
+  space_after: 0pt
 
-# 表格
+inline:
+  bold:
+    font_color: null
+  italic:
+    font_color: null
+  code:
+    font_name: "Consolas"
+    font_size: 11pt
+    font_color: "#D14"
+    background: "#F5F5F5"
+
 table:
   style: "Light Grid Accent 1"
-  font_name: "宋体"
-  font_size: 11pt
+  font_name: "仿宋"
+  font_size: 12pt
   header_bold: true
   header_background: "#F2F2F2"
-  border_color: "#CCCCCC"
   alignment: left
+  alternating_rows: false
 
-# 列表
 list:
   font_name: "仿宋"
   font_size: 12pt
@@ -264,37 +455,100 @@ list:
 
 ---
 
-## 🔍 使用自定义配置
+## 使用方法
 
-### 方法1：通过 CLI
+### 方法1：CLI 命令行
+
 ```bash
-# 使用自定义配置文件
-uv run md2docx input.md -s my_styles.yaml
+# 使用默认配置
+uv run md2docx input.md
+
+# 指定自定义配置文件
+uv run md2docx input.md -s custom_styles.yaml
+
+# 指定输出文件
+uv run md2docx input.md -o output.docx -s my_styles.yaml
 ```
 
-### 方法2：通过 Python API
+### 方法2：Python API
+
 ```python
 from md2docx import Converter
 
-converter = Converter(style_config='my_styles.yaml')
+# 使用默认配置
+converter = Converter()
 converter.convert('input.md', 'output.docx')
+
+# 使用自定义配置
+converter = Converter(style_config='custom_styles.yaml')
+converter.convert('input.md', 'output.docx')
+
+# 转换字符串
+md_content = "# 标题\n\n这是一段文字"
+converter.convert_string(md_content, 'output.docx')
 ```
 
 ---
 
-## ⚠️ 注意事项
+## 注意事项
 
-1. **字体可用性**：确保配置中使用的字体在系统中已安装
-2. **中文字体**：推荐使用"宋体"、"仿宋"、"黑体"、"楷体"、"微软雅黑"
-3. **颜色格式**：必须使用引号，如 `"#000000"`
-4. **单位必须带**：如 `12pt`、`2.54cm`，不能只写数字
-5. **布尔值**：`true`/`false` 不需要引号
-6. **YAML 语法**：注意缩进（2个空格），冒号后要有空格
+### ⚠️ 重要提示
+
+1. **字体可用性**
+   - 确保配置中使用的字体在系统中已安装
+   - Windows/Mac 字体名称可能不同
+   - 推荐使用系统通用字体
+
+2. **YAML 语法**
+   - 使用 2 个空格缩进（不要用 Tab）
+   - 冒号后必须有空格：`key: value`
+   - 字符串建议加引号：`"仿宋"`
+
+3. **单位必须带上**
+   - 字号：`12pt`（不能只写 `12`）
+   - 边距：`2.54cm`（不能只写 `2.54`）
+
+4. **颜色格式**
+   - 必须用引号：`"#000000"`（不能写成 `#000000`）
+   - 使用 6 位十六进制：`#RRGGBB`
+
+5. **布尔值**
+   - 直接写：`true` 或 `false`
+   - 不要加引号
+
+6. **null 值**
+   - 表示继承或不设置
+   - 直接写：`null`（不加引号）
 
 ---
 
-## 📚 参考资源
+## 常见问题
 
-- [python-docx 文档](https://python-docx.readthedocs.io/)
-- [Word 内置样式参考](https://python-docx.readthedocs.io/en/latest/user/styles.html)
-- [YAML 语法指南](https://yaml.org/)
+**Q: 如何让段落不首行缩进？**  
+A: 设置 `paragraph.first_line_indent: 0`
+
+**Q: 如何启用表格斑马纹？**  
+A: 设置 `table.alternating_rows: true`
+
+**Q: 如何自定义粗体和斜体的颜色？**  
+A: 设置 `inline.bold.font_color` 和 `inline.italic.font_color`
+
+**Q: 支持哪些对齐方式？**  
+A: `left`（左对齐）、`center`（居中）、`right`（右对齐）、`justify`（两端对齐）
+
+**Q: Markdown 表格对齐语法会覆盖配置吗？**  
+A: 是的，Markdown 中的 `:---`、`:--:`、`---:` 会覆盖 `table.alignment` 设置
+
+---
+
+## 参考资源
+
+- [python-docx 官方文档](https://python-docx.readthedocs.io/)
+- [Markdown 语法指南](https://www.markdownguide.org/)
+- [YAML 语法参考](https://yaml.org/)
+
+---
+
+**文档版本**: v1.0  
+**适用版本**: md2docx >= 1.0  
+**最后更新**: 2025-11-20
