@@ -24,8 +24,8 @@ heading2:
   font_size: 16pt
   font_color: "#000000"
   bold: true
-  space_before: 10pt
-  space_after: 10pt
+  space_before: 6pt
+  space_after: 6pt
   alignment: left
   first_line_indent: 2
 
@@ -34,8 +34,8 @@ heading3:
   font_size: 16pt
   font_color: "#000000"
   bold: true
-  space_before: 8pt
-  space_after: 8pt
+  space_before: 6pt
+  space_after: 6pt
   alignment: left
   first_line_indent: 2
 

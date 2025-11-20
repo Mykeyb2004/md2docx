@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 md2docx = "md2docx.cli:main"
+md2docx-gui = "md2docx.gui:main"
 
 [build-system]
 requires = ["hatchling"]
