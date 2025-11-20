@@ -22,17 +22,37 @@ pip install md2docx
 
 ## Quick Start
 
-### Command Line
+### GUI Mode (Recommended) 🎨
+
+Launch the graphical interface for easy file selection and history tracking:
 
 ```bash
-# Basic conversion
-md2docx input.md
+uv run md2docx-gui
+```
 
-# Specify output file
-md2docx input.md -o output.docx
+**Features:**
+- 📂 Visual file selection
+- 📜 Automatic history tracking
+- ✅ Progress indication
+- 🔄 Reload previous conversions
 
-# Use a style template
-md2docx input.md -t chinese_academic
+See [GUI Guide](docs/GUI_GUIDE.md) for detailed instructions.
+
+---
+
+### CLI Mode (Command Line)
+
+#### Basic Usage
+
+```bash
+# Convert a Markdown file to Word
+uv run md2docx input.md
+
+# Specify output filename
+uv run md2docx input.md -o output.docx
+
+# Use custom style configuration
+uv run md2docx input.md -s custom_styles.yaml
 ```
 
 ### Python API

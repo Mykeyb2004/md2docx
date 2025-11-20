@@ -94,11 +94,80 @@ class Converter:
         # Apply document-level styles
         doc_style = self.style_manager.get_document_style()
         
-        # TODO: Apply document margins, page size, etc.
-        # This requires more advanced document manipulation
+        # Apply document settings
+        self._apply_document_settings(doc, doc_style)
         
         # Parse Markdown and add content to document
         self.parser.parse(md_content, doc)
         
         return doc
-
+    
+    def _apply_document_settings(self, doc: Document, style: dict) -> None:
+        """
+        Apply document-level settings like page size and margins.
+        
+        Args:
+            doc: python-docx Document object
+            style: Document style configuration
+        """
+        from docx.shared import Inches, Cm, Pt
+        from docx.enum.section import WD_SECTION
+        
+        # Get the default section
+        section = doc.sections[0]
+        
+        # Apply page size
+        if 'page_size' in style:
+            page_size = style['page_size'].upper()
+            if page_size == 'A4':
+                section.page_height = Cm(29.7)
+                section.page_width = Cm(21.0)
+            elif page_size == 'A3':
+                section.page_height = Cm(42.0)
+                section.page_width = Cm(29.7)
+            elif page_size == 'LETTER':
+                section.page_height = Inches(11)
+                section.page_width = Inches(8.5)
+        
+        # Apply margins
+        if 'margin_top' in style:
+            section.top_margin = self._parse_length(style['margin_top'])
+        
+        if 'margin_bottom' in style:
+            section.bottom_margin = self._parse_length(style['margin_bottom'])
+        
+        if 'margin_left' in style:
+            section.left_margin = self._parse_length(style['margin_left'])
+        
+        if 'margin_right' in style:
+            section.right_margin = self._parse_length(style['margin_right'])
+    
+    def _parse_length(self, length_str: str):
+        """
+        Parse length string to python-docx length object.
+        
+        Args:
+            length_str: Length string like "2.54cm" or "1in"
+            
+        Returns:
+            Length object (Inches, Cm, Pt, etc.)
+        """
+        from docx.shared import Inches, Cm, Pt, Mm
+        
+        length_str = str(length_str).lower().strip()
+        
+        if length_str.endswith('cm'):
+            value = float(length_str[:-2])
+            return Cm(value)
+        elif length_str.endswith('in'):
+            value = float(length_str[:-2])
+            return Inches(value)
+        elif length_str.endswith('mm'):
+            value = float(length_str[:-2])
+            return Mm(value)
+        elif length_str.endswith('pt'):
+            value = float(length_str[:-2])
+            return Pt(value)
+        else:
+            # Default to cm
+            return Cm(float(length_str))

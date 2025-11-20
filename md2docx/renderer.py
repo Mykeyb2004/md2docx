@@ -424,6 +424,10 @@ class DocxRenderer(mistune.BaseRenderer):
                     indent_size = float(indent_str[:-2])
             
             p.paragraph_format.left_indent = Inches(indent_size * (depth + 1))
+        
+        # Apply space after from list style
+        if 'space_after' in list_style:
+            p.paragraph_format.space_after = Pt(self._parse_font_size(list_style['space_after']))
 
     
     def list_item(self, token: Dict[str, Any], state: Any) -> str:
@@ -550,6 +554,10 @@ class DocxRenderer(mistune.BaseRenderer):
                     'font_size': table_style.get('font_size', '11pt')
                 }
                 self._add_formatted_text(p, text, base_style)
+                
+                # Apply line spacing to table cell paragraph
+                if 'line_spacing' in table_style:
+                    p.paragraph_format.line_spacing = table_style['line_spacing']
                 
                 # Apply cell alignment from token
                 align = cell_token.get('attrs', {}).get('align')
