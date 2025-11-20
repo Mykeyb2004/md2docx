@@ -41,7 +41,7 @@ heading3:
 
 heading4:
   font_name: "仿宋"
-  font_size: 12pt
+  font_size: 14pt
   font_color: "#000000"
   italic: false  # 斜体
   space_before: 3pt
@@ -52,7 +52,7 @@ heading4:
 # Paragraph style
 paragraph:
   font_name: "仿宋"
-  font_size: 12pt
+  font_size: 14pt
   line_spacing: 1.5
   first_line_indent: 2  # characters (中文规范：首行缩进2个字符)
   alignment: justify  # left, right, center, justify
@@ -92,7 +92,8 @@ table:
 # List style
 list:
   font_name: "仿宋"
-  font_size: 12pt
+  font_size: 14pt
+  line_spacing: 1.5
   bullet_char: "•"
   number_format: "1."
   indent_size: 0.5in
