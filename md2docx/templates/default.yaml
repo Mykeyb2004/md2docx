@@ -11,40 +11,43 @@ document:
 
 # Heading styles (levels 1-4)
 heading1:
-  font_name: "微软雅黑"
-  font_size: 18pt
+  font_name: "方正小标宋简体"
+  font_size: 22pt
   font_color: "#000080"  # Dark blue
   bold: true
-  space_before: 12pt
+  space_before: 6pt
   space_after: 6pt
-  alignment: left
+  alignment: center
 
 heading2:
-  font_name: "微软雅黑"
+  font_name: "黑体"
   font_size: 16pt
   font_color: "#000000"
   bold: true
   space_before: 10pt
-  space_after: 5pt
+  space_after: 10pt
   alignment: left
+  first_line_indent: 2
 
 heading3:
-  font_name: "微软雅黑"
-  font_size: 14pt
+  font_name: "楷体"
+  font_size: 16pt
   font_color: "#000000"
   bold: true
   space_before: 8pt
-  space_after: 4pt
+  space_after: 8pt
   alignment: left
+  first_line_indent: 2
 
 heading4:
-  font_name: "微软雅黑"
+  font_name: "仿宋"
   font_size: 12pt
   font_color: "#000000"
-  bold: true
-  space_before: 6pt
+  italic: false  # 斜体
+  space_before: 3pt
   space_after: 3pt
   alignment: left
+  first_line_indent: 2
 
 # Paragraph style
 paragraph:
@@ -53,15 +56,38 @@ paragraph:
   line_spacing: 1.5
   first_line_indent: 2  # characters (中文规范：首行缩进2个字符)
   alignment: justify  # left, right, center, justify
+  space_before: 0pt  # 段前间距
+  space_after: 0pt   # 段后间距
+
+# Inline text formatting (Markdown emphasis)
+inline:
+  # 粗体文本 (**text** 或 __text__)
+  bold:
+    font_color: null  # null 表示继承父级颜色，也可设置如 "#000000"
+  # 斜体文本 (*text* 或 _text_)
+  italic:
+    font_color: null  # null 表示继承父级颜色
+  # 行内代码 (`code`)
+  code:
+    font_name: "Consolas"
+    font_size: 11pt
+    font_color: "#D14"  # 红色
+    background: "#F5F5F5"  # 浅灰色背景
 
 # Table style
 table:
   style: "Light Grid Accent 1"
-  font_size: 11pt
+  font_name: "仿宋"
+  font_size: 12pt
+  line_spacing: 1.5
   header_bold: true
   header_background: "#F2F2F2"
   border_color: "#CCCCCC"
   alignment: left
+  # 斑马纹/交替行颜色（可选）
+  alternating_rows: false  # 是否启用交替行颜色
+  row_background_odd: "#FFFFFF"   # 奇数行背景色
+  row_background_even: "#F9F9F9"  # 偶数行背景色（浅灰）
 
 # List style
 list:

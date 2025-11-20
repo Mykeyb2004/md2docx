@@ -169,6 +169,15 @@ class DocxRenderer(mistune.BaseRenderer):
         # Parse and add formatted text to heading
         self._add_formatted_text(heading, text, style)
         
+        # Apply heading-level bold/italic from style configuration
+        # These are SEPARATE from inline markdown formatting
+        if 'bold' in style or 'italic' in style:
+            for run in heading.runs:
+                if 'bold' in style:
+                    run.font.bold = style['bold']
+                if 'italic' in style:
+                    run.font.italic = style['italic']
+        
         # Apply paragraph-level styles
         if 'alignment' in style:
             heading.alignment = self._get_alignment(style['alignment'])
@@ -178,6 +187,12 @@ class DocxRenderer(mistune.BaseRenderer):
         
         if 'space_after' in style:
             heading.paragraph_format.space_after = Pt(self._parse_font_size(style['space_after']))
+        
+        # Apply first line indent if specified
+        if 'first_line_indent' in style and style['first_line_indent'] > 0:
+            char_count = style['first_line_indent']
+            font_size_pt = self._parse_font_size(style.get('font_size', '12pt'))
+            heading.paragraph_format.first_line_indent = Pt(char_count * font_size_pt)
         
         return ''
 
@@ -226,6 +241,14 @@ class DocxRenderer(mistune.BaseRenderer):
             # 1 character width ≈ 1 * font_size in points
             p.paragraph_format.first_line_indent = Pt(char_count * font_size_pt)
         
+        # Apply space before (段前间距)
+        if 'space_before' in style:
+            p.paragraph_format.space_before = Pt(self._parse_font_size(style['space_before']))
+        
+        # Apply space after (段后间距)
+        if 'space_after' in style:
+            p.paragraph_format.space_after = Pt(self._parse_font_size(style['space_after']))
+        
         return ''
     
     def _add_formatted_text(self, paragraph: Any, text: str, base_style: Dict[str, Any]) -> None:
@@ -251,6 +274,10 @@ class DocxRenderer(mistune.BaseRenderer):
         
         bold = False
         italic = False
+        
+        # Get inline styles configuration
+        inline_bold_style = self.styles.get_inline_style('bold')
+        inline_italic_style = self.styles.get_inline_style('italic')
         
         for part in parts:
             if part == '**START_BOLD**':
@@ -281,8 +308,15 @@ class DocxRenderer(mistune.BaseRenderer):
                 # Apply formatting on top of base style
                 if bold:
                     run.font.bold = True
+                    # Apply bold color from inline config if specified
+                    if inline_bold_style.get('font_color'):
+                        run.font.color.rgb = self._parse_color(inline_bold_style['font_color'])
+                
                 if italic:
                     run.font.italic = True
+                    # Apply italic color from inline config if specified
+                    if inline_italic_style.get('font_color'):
+                        run.font.color.rgb = self._parse_color(inline_italic_style['font_color'])
     
     def text(self, token: Dict[str, Any], state: Any) -> str:
         """Render plain text."""
@@ -517,6 +551,17 @@ class DocxRenderer(mistune.BaseRenderer):
                 }
                 self._add_formatted_text(p, text, base_style)
                 
+                # Apply cell alignment from token
+                align = cell_token.get('attrs', {}).get('align')
+                if align:
+                    from docx.enum.text import WD_ALIGN_PARAGRAPH
+                    if align == 'center':
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    elif align == 'right':
+                        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    else:  # left or None
+                        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                
                 # Apply header styling - make all runs bold
                 for run in p.runs:
                     run.font.bold = True
@@ -557,6 +602,9 @@ class DocxRenderer(mistune.BaseRenderer):
         
         row = self._current_table.rows[self._current_row_idx]
         
+        # Check if alternating rows are enabled
+        alternating_rows = table_style.get('alternating_rows', False)
+        
         for col_idx, cell_token in enumerate(cells):
             if col_idx < len(row.cells):
                 cell = row.cells[col_idx]
@@ -572,6 +620,42 @@ class DocxRenderer(mistune.BaseRenderer):
                     'font_size': table_style.get('font_size', '11pt')
                 }
                 self._add_formatted_text(p, text, base_style)
+                
+                # Apply cell alignment from token
+                align = cell_token.get('attrs', {}).get('align')
+                if align:
+                    from docx.enum.text import WD_ALIGN_PARAGRAPH
+                    if align == 'center':
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    elif align == 'right':
+                        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    else:  # left or None
+                        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                
+                # Apply alternating row background (zebra striping)
+                if alternating_rows:
+                    # Row 0 is header, so data rows start from row 1
+                    # Even rows: 2, 4, 6... Odd rows: 1, 3, 5...
+                    is_even_row = (self._current_row_idx % 2) == 0
+                    
+                    if is_even_row and 'row_background_even' in table_style:
+                        bg_color = table_style['row_background_even']
+                    elif not is_even_row and 'row_background_odd' in table_style:
+                        bg_color = table_style['row_background_odd']
+                    else:
+                        bg_color = None
+                    
+                    if bg_color:
+                        try:
+                            from docx.oxml.ns import nsdecls
+                            from docx.oxml import parse_xml
+                            shading_elm = parse_xml(r'<w:shd {} w:fill="{}"/>'.format(
+                                nsdecls('w'), 
+                                bg_color.replace('#', '')
+                            ))
+                            cell._element.get_or_add_tcPr().append(shading_elm)
+                        except:
+                            pass  # Ignore if shading fails
         
         self._current_row_idx += 1
         return ''
