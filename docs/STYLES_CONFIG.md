@@ -17,7 +17,7 @@
 
 ## 配置文件概述
 
-`md2docx` 使用 **YAML 格式**的配置文件定义 Word 文档样式。配置文件包含以下 7 个配置节：
+`md2docx` 使用 **YAML 格式**的配置文件定义 Word 文档样式。配置文件包含以下 8 个配置节：
 
 | 配置节 | 说明 | 必需 |
 |:------|:-----|:----:|
@@ -25,6 +25,7 @@
 | `heading1-4` | 标题样式（1-4级） | ✅ |
 | `paragraph` | 段落样式 | ✅ |
 | `inline` | 行内文本样式（粗体、斜体、代码） | ⭕ |
+| `code_block` | 代码块样式 | ⭕ |
 | `table` | 表格样式 | ⭕ |
 | `list` | 列表样式 | ⭕ |
 
@@ -178,7 +179,68 @@ inline:
 
 ---
 
-### 5️⃣ table - 表格样式
+### 5️⃣ code_block - 代码块样式
+
+定义 Markdown 代码块（使用三个反引号 ``` 包围）的样式。
+
+```yaml
+code_block:
+  font_name: "Consolas"
+  font_size: 10pt
+  font_color: "#24292E"  # GitHub 深灰色
+  background: "#F6F8FA"  # GitHub 浅灰背景
+  border_color: "#D0D7DE"  # 边框颜色
+  bold: false  # 是否加粗
+  italic: false  # 是否斜体
+  line_spacing: 1.2
+  space_before: 6pt
+  space_after: 6pt
+  padding: 6pt  # 内边距
+```
+
+**参数说明**：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|:-----|:----:|:-------|:-----|
+| `font_name` | 字符串 | `"Consolas"` | 代码字体（建议等宽字体） |
+| `font_size` | 字符串 | `10pt` | 代码字号 |
+| `font_color` | 字符串 | `"#24292E"` | 代码文字颜色 |
+| `background` | 字符串 | `"#F6F8FA"` | 代码块背景颜色 |
+| `border_color` | 字符串 | `"#D0D7DE"` | 边框颜色（预留） |
+| `bold` | 布尔值 | `false` | 是否加粗 |
+| `italic` | 布尔值 | `false` | 是否斜体 |
+| `line_spacing` | 数字 | `1.2` | 行距倍数 |
+| `space_before` | 字符串 | `6pt` | 段前间距 |
+| `space_after` | 字符串 | `6pt` | 段后间距 |
+| `padding` | 字符串 | `6pt` | 内边距 |
+
+**Markdown 语法对应**：
+
+````markdown
+```python
+def hello():
+    print("Hello")
+```
+````
+
+**推荐字体**：
+- **Consolas** - Windows 系统等宽字体（推荐）
+- **Courier New** - 跨平台等宽字体
+- **Monaco** - macOS 等宽字体
+- **Source Code Pro** - 开源等宽字体
+
+**颜色方案**：
+
+| 方案 | 背景色 | 文字色 | 说明 |
+|:-----|:-------|:-------|:-----|
+| GitHub 风格 | `#F6F8FA` | `#24292E` | 默认推荐 |
+| VS Code 亮色 | `#F5F5F5` | `#333333` | 浅灰背景 |
+| 极简风格 | `#FAFAFA` | `#000000` | 接近白色 |
+| 深色风格 | `#2D2D2D` | `#F8F8F2` | 深色背景 |
+
+---
+
+### 6️⃣ table - 表格样式
 
 定义表格的样式。
 

@@ -74,6 +74,19 @@ inline:
     font_color: "#D14"  # 红色
     background: "#F5F5F5"  # 浅灰色背景
 
+# Code block style (```code```)
+code_block:
+  font_name: " 宋体"
+  font_size: 14pt
+  bold: true
+  font_color: "#24292E"  # GitHub 深灰色
+  background: "#F6F8FA"  # GitHub 浅灰背景
+  border_color: "#D0D7DE"  # 边框颜色
+  line_spacing: 1.5
+  space_before: 6pt
+  space_after: 6pt
+  padding: 12pt  # 内边距
+
 # Table style
 table:
   style: "Light Grid Accent 1"
