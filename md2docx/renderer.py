@@ -50,7 +50,7 @@ class DocxRenderer(mistune.BaseRenderer):
         Parse color string to RGBColor.
         
         Args:
-            color_str: Color string like "#FF0000" or "FF0000"
+            color_str: Color string like "#FF0000" or "FF0000" or "#D14" (short format)
             
         Returns:
             RGBColor object
@@ -59,6 +59,10 @@ class DocxRenderer(mistune.BaseRenderer):
         
         if color_str.startswith('#'):
             color_str = color_str[1:]
+        
+        # Support short format (#RGB -> #RRGGBB)
+        if len(color_str) == 3:
+            color_str = ''.join([c*2 for c in color_str])
         
         r = int(color_str[0:2], 16)
         g = int(color_str[2:4], 16)
@@ -261,23 +265,27 @@ class DocxRenderer(mistune.BaseRenderer):
             base_style: Base style configuration
         """
         # mistune converts markdown to HTML tags in text
-        # We need to parse <strong>, <em>, etc.
+        # We need to parse <strong>, <em>, <code>, etc.
         
         # Replace HTML tags with markers
         text = text.replace('<strong>', '**START_BOLD**')
         text = text.replace('</strong>', '**END_BOLD**')
         text = text.replace('<em>', '**START_ITALIC**')
         text = text.replace('</em>', '**END_ITALIC**')
+        text = text.replace('<code>', '**START_CODE**')
+        text = text.replace('</code>', '**END_CODE**')
         
         # Split by markers and process
-        parts = re.split(r'(\*\*START_BOLD\*\*|\*\*END_BOLD\*\*|\*\*START_ITALIC\*\*|\*\*END_ITALIC\*\*)', text)
+        parts = re.split(r'(\*\*START_BOLD\*\*|\*\*END_BOLD\*\*|\*\*START_ITALIC\*\*|\*\*END_ITALIC\*\*|\*\*START_CODE\*\*|\*\*END_CODE\*\*)', text)
         
         bold = False
         italic = False
+        code = False
         
         # Get inline styles configuration
         inline_bold_style = self.styles.get_inline_style('bold')
         inline_italic_style = self.styles.get_inline_style('italic')
+        inline_code_style = self.styles.get_inline_style('code')
         
         for part in parts:
             if part == '**START_BOLD**':
@@ -288,35 +296,68 @@ class DocxRenderer(mistune.BaseRenderer):
                 italic = True
             elif part == '**END_ITALIC**':
                 italic = False
+            elif part == '**START_CODE**':
+                code = True
+            elif part == '**END_CODE**':
+                code = False
             elif part:  # Actual text content
                 run = paragraph.add_run(part)
                 
-                # Apply base style - ALWAYS apply font settings
-                if 'font_name' in base_style:
-                    run.font.name = base_style['font_name']
-                    # Also set East Asian font for Chinese characters
-                    from docx.oxml import OxmlElement
-                    from docx.oxml.ns import qn
-                    run._element.rPr.rFonts.set(qn('w:eastAsia'), base_style['font_name'])
-                
-                if 'font_size' in base_style:
-                    run.font.size = Pt(self._parse_font_size(base_style['font_size']))
-                
-                if 'font_color' in base_style:
-                    run.font.color.rgb = self._parse_color(base_style['font_color'])
-                
-                # Apply formatting on top of base style
-                if bold:
-                    run.font.bold = True
-                    # Apply bold color from inline config if specified
-                    if inline_bold_style.get('font_color'):
-                        run.font.color.rgb = self._parse_color(inline_bold_style['font_color'])
-                
-                if italic:
-                    run.font.italic = True
-                    # Apply italic color from inline config if specified
-                    if inline_italic_style.get('font_color'):
-                        run.font.color.rgb = self._parse_color(inline_italic_style['font_color'])
+                # Apply code style if in code span
+                if code:
+                    # Apply code-specific styling
+                    if inline_code_style.get('font_name'):
+                        run.font.name = inline_code_style['font_name']
+                        # Also set East Asian font
+                        from docx.oxml import OxmlElement
+                        from docx.oxml.ns import qn
+                        run._element.rPr.rFonts.set(qn('w:eastAsia'), inline_code_style['font_name'])
+                    
+                    if inline_code_style.get('font_size'):
+                        run.font.size = Pt(self._parse_font_size(inline_code_style['font_size']))
+                    
+                    if inline_code_style.get('font_color'):
+                        run.font.color.rgb = self._parse_color(inline_code_style['font_color'])
+                    
+                    # Apply background color/shading
+                    if inline_code_style.get('background'):
+                        try:
+                            from docx.oxml.ns import nsdecls
+                            from docx.oxml import parse_xml
+                            shading_elm = parse_xml(r'<w:shd {} w:fill="{}"/>'.format(
+                                nsdecls('w'), 
+                                inline_code_style['background'].replace('#', '')
+                            ))
+                            run._element.get_or_add_rPr().append(shading_elm)
+                        except:
+                            pass  # Ignore if shading fails
+                else:
+                    # Apply base style - ALWAYS apply font settings
+                    if 'font_name' in base_style:
+                        run.font.name = base_style['font_name']
+                        # Also set East Asian font for Chinese characters
+                        from docx.oxml import OxmlElement
+                        from docx.oxml.ns import qn
+                        run._element.rPr.rFonts.set(qn('w:eastAsia'), base_style['font_name'])
+                    
+                    if 'font_size' in base_style:
+                        run.font.size = Pt(self._parse_font_size(base_style['font_size']))
+                    
+                    if 'font_color' in base_style:
+                        run.font.color.rgb = self._parse_color(base_style['font_color'])
+                    
+                    # Apply formatting on top of base style
+                    if bold:
+                        run.font.bold = True
+                        # Apply bold color from inline config if specified
+                        if inline_bold_style.get('font_color'):
+                            run.font.color.rgb = self._parse_color(inline_bold_style['font_color'])
+                    
+                    if italic:
+                        run.font.italic = True
+                        # Apply italic color from inline config if specified
+                        if inline_italic_style.get('font_color'):
+                            run.font.color.rgb = self._parse_color(inline_italic_style['font_color'])
     
     def text(self, token: Dict[str, Any], state: Any) -> str:
         """Render plain text."""
@@ -331,6 +372,97 @@ class DocxRenderer(mistune.BaseRenderer):
         """Render emphasis (italic) text."""
         text = ''.join(self.render_children(token, state))
         return f"<em>{text}</em>"
+    
+    def codespan(self, token: Dict[str, Any], state: Any) -> str:
+        """Render inline code span."""
+        text = token.get('raw', '')
+        return f"<code>{text}</code>"
+    
+    def block_code(self, token: Dict[str, Any], state: Any) -> str:
+        """
+        Render code block.
+        
+        Args:
+            token: Token dictionary with 'raw' (code content) and optional 'attrs' (language)
+            state: State object
+            
+        Returns:
+            Empty string (content added to document)
+        """
+        # Get code content
+        code_text = token.get('raw', '')
+        
+        if not code_text:
+            return ''
+        
+        # Get code block style
+        code_style = self.styles.get_code_block_style()
+        
+        # Apply padding by adding spaces to each line
+        if code_style.get('padding'):
+            padding_pt = self._parse_font_size(code_style['padding'])
+            # Approximate: 1 space ≈ 0.5em for monospace fonts
+            # For 12pt padding with 10pt font: ~2-3 spaces
+            font_size = self._parse_font_size(code_style.get('font_size', '10pt'))
+            spaces_count = max(1, int(padding_pt / font_size * 2))
+            padding_str = ' ' * spaces_count
+            
+            # Add padding to each line
+            lines = code_text.split('\n')
+            padded_lines = [padding_str + line for line in lines]
+            code_text = '\n'.join(padded_lines)
+        
+        # Create paragraph for code block
+        p = self.doc.add_paragraph()
+        
+        # Add code text
+        run = p.add_run(code_text)
+        
+        # Apply font styling
+        if code_style.get('font_name'):
+            run.font.name = code_style['font_name']
+            # Also set East Asian font
+            from docx.oxml import OxmlElement
+            from docx.oxml.ns import qn
+            run._element.rPr.rFonts.set(qn('w:eastAsia'), code_style['font_name'])
+        
+        if code_style.get('font_size'):
+            run.font.size = Pt(self._parse_font_size(code_style['font_size']))
+        
+        # Apply bold and italic if specified
+        if code_style.get('bold'):
+            run.font.bold = True
+        
+        if code_style.get('italic'):
+            run.font.italic = True
+        
+        if code_style.get('font_color'):
+            run.font.color.rgb = self._parse_color(code_style['font_color'])
+        
+        # Apply background shading
+        if code_style.get('background'):
+            try:
+                from docx.oxml.ns import nsdecls
+                from docx.oxml import parse_xml
+                shading_elm = parse_xml(r'<w:shd {} w:fill="{}"/>'.format(
+                    nsdecls('w'), 
+                    code_style['background'].replace('#', '')
+                ))
+                p._element.get_or_add_pPr().append(shading_elm)
+            except:
+                pass  # Ignore if shading fails
+        
+        # Apply paragraph-level styling
+        if code_style.get('line_spacing'):
+            p.paragraph_format.line_spacing = code_style['line_spacing']
+        
+        if code_style.get('space_before'):
+            p.paragraph_format.space_before = Pt(self._parse_font_size(code_style['space_before']))
+        
+        if code_style.get('space_after'):
+            p.paragraph_format.space_after = Pt(self._parse_font_size(code_style['space_after']))
+        
+        return ''
     
     def linebreak(self, token: Dict[str, Any], state: Any) -> str:
         """Render line break."""

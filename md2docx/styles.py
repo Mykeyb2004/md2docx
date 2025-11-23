@@ -182,3 +182,12 @@ class StyleManager:
             return inline_config.get(style_type, {})
         
         return inline_config
+    
+    def get_code_block_style(self) -> Dict[str, Any]:
+        """
+        Get code block style configuration.
+        
+        Returns:
+            Style configuration dictionary
+        """
+        return self.config.get("code_block", self.DEFAULT_CONFIG.get("code_block", {}))
