@@ -519,53 +519,76 @@ class DocxRenderer(mistune.BaseRenderer):
             ordered: Whether this is an ordered list
             depth: Nesting depth (0-based)
         """
-        # Get text from children
-        text = ''.join(self.render_children(token, state))
+        # Separate inline content from nested lists
+        children = token.get('children', [])
+        inline_children = []
+        nested_lists = []
         
-        if not text or text.strip() == '':
+        for child in children:
+            if child['type'] == 'list':
+                nested_lists.append(child)
+            else:
+                inline_children.append(child)
+        
+        # Get text from inline children only
+        text = ''.join([self.render_token(child, state) for child in inline_children])
+        
+        # Only skip if there's no inline text AND no nested lists
+        if (not text or text.strip() == '') and not nested_lists:
             return
         
-        # Get list style
-        list_style = self.styles.get_list_style()
-        
-        # Add paragraph with appropriate style
-        p = self.doc.add_paragraph()
-        
-        # Parse and add formatted text
-        base_style = {
-            'font_name': list_style.get('font_name', '宋体'),
-            'font_size': list_style.get('font_size', '12pt')
-        }
-        self._add_formatted_text(p, text, base_style)
-        
-        # Apply custom list formatting
-        if ordered:
-            # Custom number format
-            number_format = list_style.get('number_format', '1.')
-            self._apply_numbered_list(p, number_format, depth)
-        else:
-            # Custom bullet character
-            bullet_char = list_style.get('bullet_char', '•')
-            self._apply_bulleted_list(p, bullet_char, depth)
-        
-        # Apply indentation for nested lists
-        if depth > 0:
-            from docx.shared import Inches
-            indent_size = 0.5  # inches per level
-            if 'indent_size' in list_style:
-                indent_str = list_style['indent_size']
-                if isinstance(indent_str, str) and indent_str.endswith('in'):
-                    indent_size = float(indent_str[:-2])
+        # If there's inline text, render it as a list item
+        if text and text.strip():
+            # Get list style
+            list_style = self.styles.get_list_style()
             
-            p.paragraph_format.left_indent = Inches(indent_size * (depth + 1))
+            # Add paragraph with appropriate style
+            p = self.doc.add_paragraph()
+            
+            # Parse and add formatted text
+            base_style = {
+                'font_name': list_style.get('font_name', '宋体'),
+                'font_size': list_style.get('font_size', '12pt')
+            }
+            self._add_formatted_text(p, text, base_style)
+            
+            # Apply custom list formatting
+            if ordered:
+                # Custom number format
+                number_format = list_style.get('number_format', '1.')
+                self._apply_numbered_list(p, number_format, depth)
+            else:
+                # Custom bullet character
+                bullet_char = list_style.get('bullet_char', '•')
+                self._apply_bulleted_list(p, bullet_char, depth)
+            
+            # Apply indentation for nested lists
+            if depth > 0:
+                from docx.shared import Inches
+                indent_size = 0.5  # inches per level
+                if 'indent_size' in list_style:
+                    indent_str = list_style['indent_size']
+                    if isinstance(indent_str, str) and indent_str.endswith('in'):
+                        indent_size = float(indent_str[:-2])
+                
+                p.paragraph_format.left_indent = Inches(indent_size * (depth + 1))
+            
+            # Apply line spacing from list style
+            if 'line_spacing' in list_style:
+                p.paragraph_format.line_spacing = list_style['line_spacing']
+            
+            # Apply space after from list style
+            if 'space_after' in list_style:
+                p.paragraph_format.space_after = Pt(self._parse_font_size(list_style['space_after']))
         
-        # Apply line spacing from list style
-        if 'line_spacing' in list_style:
-            p.paragraph_format.line_spacing = list_style['line_spacing']
-        
-        # Apply space after from list style
-        if 'space_after' in list_style:
-            p.paragraph_format.space_after = Pt(self._parse_font_size(list_style['space_after']))
+        # Render nested lists with increased depth
+        for nested_list in nested_lists:
+            # Get list type from nested list
+            nested_ordered = nested_list['attrs'].get('ordered', False)
+            # Process each child of the nested list
+            for child in nested_list.get('children', []):
+                if child['type'] == 'list_item':
+                    self._render_list_item(child, state, nested_ordered, depth + 1)
     
     def _apply_bulleted_list(self, paragraph, bullet_char: str, depth: int):
         """
