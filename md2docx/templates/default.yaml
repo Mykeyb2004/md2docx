@@ -111,3 +111,15 @@ list:
   number_format: "1."
   indent_size: 0.5in
   space_after: 3pt
+
+# Math formula style (rendered as images)
+math_inline:
+  height: 0.15in  # 行内公式图片高度
+  dpi: 300        # 渲染分辨率
+
+math_block:
+  width: 4in      # 块级公式图片宽度 
+  alignment: center
+  space_before: 6pt
+  space_after: 6pt
+  dpi: 300        # 渲染分辨率

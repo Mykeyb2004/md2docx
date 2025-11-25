@@ -3,10 +3,11 @@ Word document renderer module.
 """
 from typing import Any, Dict, Optional
 from docx import Document
-from docx.shared import Pt, RGBColor
+from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import re
 import mistune
+from io import BytesIO
 
 
 class DocxRenderer(mistune.BaseRenderer):
@@ -24,6 +25,11 @@ class DocxRenderer(mistune.BaseRenderer):
         self.doc = doc
         self.styles = style_manager
         self._current_paragraph = None
+        self.math_formulas = {'inline': [], 'block': []}  # Will be set by parser
+        
+        # Initialize math converter for LaTeX formulas
+        from md2docx.math_converter import MathConverter
+        self.math_converter = MathConverter(dpi=300)
     
     def _parse_font_size(self, size_str: str) -> int:
         """
@@ -215,6 +221,37 @@ class DocxRenderer(mistune.BaseRenderer):
         # Get text from children
         text = ''.join(self.render_children(token, state))
         
+        # Handle block math formulas (they appear as their own paragraphs)
+        # Unicode brackets: 〔BLOCK_MATH_N〕
+        text_stripped = text.strip()
+        if text_stripped.startswith('〔BLOCK_MATH_') and text_stripped.endswith('〕'):
+            idx_str = text_stripped.replace('〔BLOCK_MATH_', '').replace('〕', '')
+            try:
+                idx = int(idx_str)
+                if idx < len(self.math_formulas.get('block', [])):
+                    latex = self.math_formulas['block'][idx]
+                    try:
+                        img_bytes = self.math_converter.latex_to_image(latex, inline=False)
+                        
+                        # Create a centered paragraph for the formula
+                        p = self.doc.add_paragraph()
+                        p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                        
+                        # Add image
+                        run = p.add_run()
+                        run.add_picture(BytesIO(img_bytes), width=Inches(4))
+                        
+                        # Apply spacing
+                        p.paragraph_format.space_before = Pt(6)
+                        p.paragraph_format.space_after = Pt(6)
+                        
+                        return ''
+                    except Exception as e:
+                        # Fallback: show LaTeX code
+                        text = f'$$\\n{latex}\\n$$'
+            except:
+                pass
+        
         # Skip empty paragraphs
         if not text or text.strip() == '':
             return ''
@@ -275,8 +312,8 @@ class DocxRenderer(mistune.BaseRenderer):
         text = text.replace('<code>', '**START_CODE**')
         text = text.replace('</code>', '**END_CODE**')
         
-        # Split by markers and process
-        parts = re.split(r'(\*\*START_BOLD\*\*|\*\*END_BOLD\*\*|\*\*START_ITALIC\*\*|\*\*END_ITALIC\*\*|\*\*START_CODE\*\*|\*\*END_CODE\*\*)', text)
+        # Split by markers and process (including math placeholders with Unicode brackets)
+        parts = re.split(r'(\*\*START_BOLD\*\*|\*\*END_BOLD\*\*|\*\*START_ITALIC\*\*|\*\*END_ITALIC\*\*|\*\*START_CODE\*\*|\*\*END_CODE\*\*|〔INLINE_MATH_\d+〕|〔BLOCK_MATH_\d+〕)', text)
         
         bold = False
         italic = False
@@ -300,6 +337,27 @@ class DocxRenderer(mistune.BaseRenderer):
                 code = True
             elif part == '**END_CODE**':
                 code = False
+            elif part.startswith('〔INLINE_MATH_') and part.endswith('〕'):
+                # Handle inline math formulas with Unicode brackets
+                idx_str = part.replace('〔INLINE_MATH_', '').replace('〕', '')
+                try:
+                    idx = int(idx_str)
+                    formulas = getattr(self, 'math_formulas', {'inline': []})
+                    if idx < len(formulas.get('inline', [])):
+                        latex = formulas['inline'][idx]
+                        try:
+                            img_bytes = self.math_converter.latex_to_image(latex, inline=True)
+                            run = paragraph.add_run()
+                            run.add_picture(BytesIO(img_bytes), height=Inches(0.15))
+                        except:
+                            # Fallback: show LaTeX code
+                            paragraph.add_run(f'${latex}$')
+                except:
+                    pass
+            elif part.startswith('〔BLOCK_MATH_') and part.endswith('〕'):
+                # Block math should not appear in inline text
+                # This shouldn't happen with proper preprocessing
+                pass
             elif part:  # Actual text content
                 run = paragraph.add_run(part)
                 
@@ -377,6 +435,74 @@ class DocxRenderer(mistune.BaseRenderer):
         """Render inline code span."""
         text = token.get('raw', '')
         return f"<code>{text}</code>"
+    
+    def inline_math(self, token: Dict[str, Any], state: Any) -> str:
+        """
+        Render inline LaTeX math formula.
+        
+        Args:
+            token: Token with 'raw' containing LaTeX formula
+            state: State object
+            
+        Returns:
+            Marker string for later processing
+        """
+        latex = token.get('raw', '')
+        if not latex:
+            return ''
+        
+        try:
+            # Render formula to image
+            img_bytes = self.math_converter.latex_to_image(latex, inline=True)
+            
+            # Create a marker that will be replaced in paragraph processing
+            # For now, add image to current paragraph immediately
+            # Note: This is a simplified approach for inline formulas
+            return f'**INLINE_MATH:{latex}**'
+        except Exception as e:
+            # If rendering fails, show the LaTeX code
+            return f'${latex}$'
+    
+    def block_math(self, token: Dict[str, Any], state: Any) -> str:
+        """
+        Render block LaTeX math formula.
+        
+        Args:
+            token: Token with 'raw' containing LaTeX formula
+            state: State object
+            
+        Returns:
+            Empty string (content added to document)
+        """
+        latex = token.get('raw', '')
+        if not latex:
+            return ''
+        
+        try:
+            # Render formula to image
+            img_bytes = self.math_converter.latex_to_image(latex, inline=False)
+            
+            # Create a centered paragraph for the formula
+            p = self.doc.add_paragraph()
+            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            
+            # Add image to paragraph
+            run = p.add_run()
+            run.add_picture(BytesIO(img_bytes), width=Inches(4))
+            
+            # Apply spacing from math_block style if available
+            math_style = self.styles.get_style('math_block', {})
+            if 'space_before' in math_style:
+                p.paragraph_format.space_before = Pt(self._parse_font_size(math_style['space_before']))
+            if 'space_after' in math_style:
+                p.paragraph_format.space_after = Pt(self._parse_font_size(math_style['space_after']))
+            
+            return ''
+        except Exception as e:
+            # If rendering fails, show the LaTeX code in a code block
+            p = self.doc.add_paragraph(f'$$\n{latex}\n$$')
+            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            return ''
     
     def block_code(self, token: Dict[str, Any], state: Any) -> str:
         """
