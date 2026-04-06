@@ -252,6 +252,8 @@ table:
   line_spacing: 1.5              # 行距
   header_bold: true              # 表头加粗
   header_background: "#F2F2F2"   # 表头背景色
+  header_alignment: center       # 表头水平对齐
+  header_vertical_alignment: center  # 表头垂直对齐
   border_color: "#CCCCCC"        # 边框颜色
   alignment: left                # 默认对齐（可被Markdown对齐语法覆盖）
   
@@ -271,6 +273,8 @@ table:
 | `line_spacing` | 数字 | `1.5` | `1.0`-`2.0` | 行距 |
 | `header_bold` | 布尔值 | `true` | `true`/`false` | 表头是否加粗 |
 | `header_background` | 字符串 | `"#F2F2F2"` | 十六进制颜色 | 表头背景色 |
+| `header_alignment` | 字符串 | `center` | `left`, `center`, `right`, `inherit` | 表头水平对齐 |
+| `header_vertical_alignment` | 字符串 | `center` | `top`, `center`, `bottom` | 表头垂直对齐 |
 | `border_color` | 字符串 | `"#CCCCCC"` | 十六进制颜色 | 边框颜色 |
 | `alignment` | 字符串 | `left` | `left`, `center`, `right` | 默认对齐 |
 | `alternating_rows` | 布尔值 | `false` | `true`/`false` | 启用斑马纹 |
@@ -503,6 +507,8 @@ table:
   font_size: 12pt
   header_bold: true
   header_background: "#F2F2F2"
+  header_alignment: center
+  header_vertical_alignment: center
   alignment: left
   alternating_rows: false
 

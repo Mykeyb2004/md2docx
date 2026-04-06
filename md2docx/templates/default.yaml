@@ -95,6 +95,8 @@ table:
   line_spacing: 1.5
   header_bold: true
   header_background: "#F2F2F2"
+  header_alignment: center
+  header_vertical_alignment: center
   border_color: "#CCCCCC"
   alignment: left
   # 斑马纹/交替行颜色（可选）

@@ -68,6 +68,8 @@ table:
   font_size: 11pt                # 字体大小
   header_bold: true              # 表头加粗
   header_background: "#F2F2F2"   # 表头背景色
+  header_alignment: center       # 表头水平居中
+  header_vertical_alignment: center  # 表头垂直居中
   border_color: "#CCCCCC"        # 边框颜色
   alignment: left                # 默认对齐方式
   

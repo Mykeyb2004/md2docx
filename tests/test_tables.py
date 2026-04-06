@@ -6,6 +6,8 @@ from pathlib import Path
 import tempfile
 from md2docx import Converter
 from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 
 
 def test_simple_table():
@@ -99,5 +101,31 @@ End of report.
         doc = Document(output_path)
         assert len(doc.tables) >= 1
         assert len(doc.paragraphs) > 3
+    finally:
+        Path(output_path).unlink(missing_ok=True)
+
+
+def test_table_header_is_centered_both_horizontally_and_vertically():
+    """Test table headers default to centered alignment in both directions."""
+    converter = Converter()
+
+    md_content = """
+| 类型 | 主要特征 |
+|------|----------|
+| A | B |
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter.convert_string(md_content, output_path)
+        doc = Document(output_path)
+        table = doc.tables[0]
+        header_cell = table.rows[0].cells[0]
+        header_paragraph = header_cell.paragraphs[0]
+
+        assert header_paragraph.alignment == WD_PARAGRAPH_ALIGNMENT.CENTER
+        assert header_cell.vertical_alignment == WD_CELL_VERTICAL_ALIGNMENT.CENTER
     finally:
         Path(output_path).unlink(missing_ok=True)
