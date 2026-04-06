@@ -236,6 +236,8 @@ table:
   font_size: 12pt
   header_bold: true
   header_background: "#F2F2F2"
+  header_alignment: center
+  header_vertical_alignment: center
   # 斑马纹
   alternating_rows: true
   row_background_even: "#F9F9F9"

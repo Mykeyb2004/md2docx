@@ -44,7 +44,10 @@ class StyleManager:
         },
         "table": {
             "style": "Light Grid Accent 1",
-            "font_size": "11pt"
+            "font_size": "11pt",
+            "alignment": "left",
+            "header_alignment": "center",
+            "header_vertical_alignment": "center",
         },
         "list": {
             "bullet_char": "•",

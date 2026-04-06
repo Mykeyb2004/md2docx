@@ -4,6 +4,7 @@ Word document renderer module.
 from typing import Any, Dict, Optional, Tuple
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches, Cm, Mm, Emu
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import re
 import mistune
@@ -96,6 +97,15 @@ class DocxRenderer(mistune.BaseRenderer):
             'justify': WD_PARAGRAPH_ALIGNMENT.JUSTIFY,
         }
         return alignment_map.get(alignment_str.lower(), WD_PARAGRAPH_ALIGNMENT.LEFT)
+
+    def _get_vertical_alignment(self, alignment_str: str) -> WD_CELL_VERTICAL_ALIGNMENT:
+        """Get cell vertical alignment enum from string."""
+        alignment_map = {
+            'top': WD_CELL_VERTICAL_ALIGNMENT.TOP,
+            'center': WD_CELL_VERTICAL_ALIGNMENT.CENTER,
+            'bottom': WD_CELL_VERTICAL_ALIGNMENT.BOTTOM,
+        }
+        return alignment_map.get(alignment_str.lower(), WD_CELL_VERTICAL_ALIGNMENT.TOP)
 
     def _parse_length(self, length_value: Any, default_unit: str = 'pt'):
         """
@@ -1173,6 +1183,8 @@ class DocxRenderer(mistune.BaseRenderer):
         """Render table header."""
         cells = token.get('children', [])
         table_style = self.styles.get_table_style()
+        header_alignment = str(table_style.get('header_alignment', 'center')).lower()
+        header_vertical_alignment = str(table_style.get('header_vertical_alignment', 'center')).lower()
         
         if not self._current_table:
             return ''
@@ -1199,16 +1211,13 @@ class DocxRenderer(mistune.BaseRenderer):
                 if 'line_spacing' in table_style:
                     p.paragraph_format.line_spacing = table_style['line_spacing']
                 
-                # Apply cell alignment from token
-                align = cell_token.get('attrs', {}).get('align')
-                if align:
-                    from docx.enum.text import WD_ALIGN_PARAGRAPH
-                    if align == 'center':
-                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    elif align == 'right':
-                        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                    else:  # left or None
-                        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                # Center header text by default, with an opt-in inherit mode.
+                align = cell_token.get('attrs', {}).get('align') or table_style.get('alignment', 'left')
+                if header_alignment == 'inherit':
+                    p.alignment = self._get_alignment(str(align))
+                else:
+                    p.alignment = self._get_alignment(header_alignment)
+                cell.vertical_alignment = self._get_vertical_alignment(header_vertical_alignment)
                 
                 # Apply header styling - make all runs bold
                 for run in p.runs:
@@ -1269,16 +1278,9 @@ class DocxRenderer(mistune.BaseRenderer):
                 }
                 self._add_formatted_text(p, text, base_style)
                 
-                # Apply cell alignment from token
-                align = cell_token.get('attrs', {}).get('align')
-                if align:
-                    from docx.enum.text import WD_ALIGN_PARAGRAPH
-                    if align == 'center':
-                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    elif align == 'right':
-                        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                    else:  # left or None
-                        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                # Apply column alignment, falling back to the configured table default.
+                align = cell_token.get('attrs', {}).get('align') or table_style.get('alignment', 'left')
+                p.alignment = self._get_alignment(str(align))
                 
                 # Apply alternating row background (zebra striping)
                 if alternating_rows:
