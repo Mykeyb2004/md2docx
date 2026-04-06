@@ -1,7 +1,7 @@
 # md2docx 样式配置完整指南
 
 > **版本**: v1.0  
-> **最后更新**: 2025-11-20
+> **最后更新**: 2026-04-06
 
 ## 📋 目录
 
@@ -17,7 +17,7 @@
 
 ## 配置文件概述
 
-`md2docx` 使用 **YAML 格式**的配置文件定义 Word 文档样式。配置文件包含以下 8 个配置节：
+`md2docx` 使用 **YAML 格式**的配置文件定义 Word 文档样式。配置文件包含以下 10 个配置节/配置组：
 
 | 配置节 | 说明 | 必需 |
 |:------|:-----|:----:|
@@ -28,6 +28,9 @@
 | `code_block` | 代码块样式 | ⭕ |
 | `table` | 表格样式 | ⭕ |
 | `list` | 列表样式 | ⭕ |
+| `math_inline` | 行内公式图片样式 | ⭕ |
+| `math_block` | 块级公式图片样式 | ⭕ |
+| `mermaid` | Mermaid 图片样式与分页策略 | ⭕ |
 
 ---
 
@@ -324,6 +327,86 @@ list:
 | `number_format` | 字符串 | `"1."` | `"1."`, `"1)"`, `"(1)"` | 有序列表格式 |
 | `indent_size` | 字符串 | `0.5in` | 任意尺寸 + 单位 | 每级缩进大小 |
 | `space_after` | 字符串 | `3pt` | 任意尺寸 + `pt` | 列表项后间距 |
+
+---
+
+### 7️⃣ mermaid - Mermaid 图样式
+
+定义 Mermaid 代码块渲染为图片后的尺寸、对齐和紧凑排版策略。
+
+```yaml
+mermaid:
+  command: mmdc
+  format: png
+  width: 5.5in
+  alignment: center
+  space_before: 6pt
+  space_after: 6pt
+  background_color: white
+  soft_max_height_ratio: 0.68
+  hard_max_height_ratio: 0.82
+  page_max_height_ratio: 0.92
+  page_break_threshold_ratio: 0.90
+  min_readable_width: 3.2in
+  oversized_strategy: page
+  force_page_break_before_oversized: false
+  keep_with_previous: true
+  follow_previous_trigger_height_ratio: 0.24
+  follow_previous_width_ratio: 0.55
+  follow_previous_space_before: 0pt
+  keep_together: true
+  keep_with_next: false
+  widow_control: false
+```
+
+**参数说明**：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|:-----|:----:|:-------|:-----|
+| `command` | 字符串 | `mmdc` | Mermaid CLI 命令名或路径 |
+| `format` | 字符串 | `png` | 输出图片格式 |
+| `width` | 字符串 | `5.5in` | Mermaid 图片的首选宽度 |
+| `alignment` | 字符串 | `center` | 图片段落对齐方式，建议保持居中 |
+| `space_before` | 字符串 | `6pt` | 常规 Mermaid 图片的段前距 |
+| `space_after` | 字符串 | `6pt` | Mermaid 图片的段后距 |
+| `background_color` | 字符串 | `white` | Mermaid 导出背景色 |
+| `soft_max_height_ratio` | 数字 | `0.68` | 软高度上限，占可用页高的比例 |
+| `hard_max_height_ratio` | 数字 | `0.82` | 硬高度上限，超过后会缩放 |
+| `page_max_height_ratio` | 数字 | `0.92` | 需要另起页时允许的最大高度比例 |
+| `page_break_threshold_ratio` | 数字 | `0.90` | 超过该比例时优先考虑分页 |
+| `min_readable_width` | 字符串 | `3.2in` | 如果缩放后宽度低于该值，可触发分页策略 |
+| `oversized_strategy` | 字符串 | `page` | 超大图处理策略，`page` 表示按整页优先的尺寸上限处理 |
+| `force_page_break_before_oversized` | 布尔值 | `false` | 是否对超大图写入硬性的段前分页 |
+| `keep_with_previous` | 布尔值 | `true` | 是否默认把 Mermaid 图片与上一段设置为同页优先 |
+| `follow_previous_trigger_height_ratio` | 数字 | `0.24` | “小图”阈值，按图片最终高度占可用页高的比例判断。值越大越宽松 |
+| `follow_previous_width_ratio` | 数字 | `0.55` | 命中“小图”规则后，图片最多占可用页宽的比例 |
+| `follow_previous_space_before` | 字符串 | `0pt` | 小图贴靠上一段时的段前距 |
+| `keep_together` | 布尔值 | `true` | 图片段内部尽量保持在一起 |
+| `keep_with_next` | 布尔值 | `false` | 图片段是否与后续段落绑定 |
+| `widow_control` | 布尔值 | `false` | 是否启用孤行控制 |
+
+**与上一段跟随的行为**：
+
+- 默认情况下，只要 Mermaid 图片前面存在一个正文段落，就会把上一段设置为“与下段同页”优先。
+- 这样即使导出后你在 Word 里手工缩小图片，Word 也更容易把“上一段 + 图片”重新排到同一页。
+- 只有当你显式设置 `force_page_break_before_oversized: true` 时，超大图才会带上硬性的段前分页。
+
+**小图贴靠上一段的行为**：
+
+- 当 Mermaid 图按常规缩放后高度不超过 `follow_previous_trigger_height_ratio` 时，会被视为“小图”。
+- 命中该规则后，图片会进一步按 `follow_previous_width_ratio` 收紧宽度，并保持居中单独成行。
+- 如果图片前面紧邻一个正文段落，渲染器会进一步把图片段前距改为 `follow_previous_space_before`，让“上一段 + 图片”尽量留在同一页。
+
+**推荐调参**：
+
+- 想更容易贴近上一段：`follow_previous_trigger_height_ratio: 0.30`，`follow_previous_width_ratio: 0.60`
+- 想更谨慎，只让很小的图贴近上一段：`follow_previous_trigger_height_ratio: 0.18`，`follow_previous_width_ratio: 0.45`
+
+**注意**：
+
+- 这些阈值属于排版经验值，不是 Word 的固定标准。
+- 默认实现刻意避免给超大 Mermaid 图写死段前分页，目的是保留后续人工缩放后的回流空间。
+- Word 最终如何分页仍由其版式引擎决定，因此这里实现的是“强引导”，不是逐页精确计算。
 
 ---
 

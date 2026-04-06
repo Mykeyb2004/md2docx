@@ -57,6 +57,47 @@ def test_mermaid_block_renders_as_centered_image():
     assert len(doc.inline_shapes) == 1
 
 
+def test_small_mermaid_block_stays_attached_to_previous_paragraph():
+    """Compact Mermaid diagrams should stay with the previous text paragraph."""
+    doc = Document()
+    style_manager = StyleManager()
+    style_manager.config.setdefault('mermaid', {}).update({
+        'width': '5.5in',
+        'page_break_threshold_ratio': 1.0,
+        'follow_previous_trigger_height_ratio': 0.30,
+        'follow_previous_width_ratio': 0.45,
+        'follow_previous_space_before': '0pt',
+        'oversized_strategy': 'shrink',
+    })
+    renderer = DocxRenderer(doc, style_manager)
+
+    class DummyMermaidConverter:
+        def mermaid_to_image(self, code: str) -> bytes:
+            return _sample_png_bytes_with_size(800, 240)
+
+    renderer.mermaid_converter = DummyMermaidConverter()
+
+    doc.add_paragraph("上一段正文内容")
+
+    token = {
+        'type': 'block_code',
+        'raw': 'graph TD\nA-->B\n',
+        'attrs': {'info': 'mermaid'},
+    }
+
+    renderer.block_code(token, _MockState())
+
+    assert len(doc.paragraphs) == 2
+    assert doc.paragraphs[0].paragraph_format.keep_with_next is True
+    assert doc.paragraphs[1].alignment == WD_PARAGRAPH_ALIGNMENT.CENTER
+    assert int(doc.paragraphs[1].paragraph_format.space_before) == 0
+    assert len(doc.inline_shapes) == 1
+    shape = doc.inline_shapes[0]
+    compact_width_limit = int(renderer._get_available_page_width()) * 0.45
+    assert int(shape.width) <= int(compact_width_limit)
+    assert int(shape.width) < int(renderer._parse_length('5.5in', default_unit='in'))
+
+
 def test_mermaid_block_scales_tall_image_to_fit_page_height():
     """Tall Mermaid diagrams should be reduced to the configured height limit."""
     doc = Document()
@@ -91,8 +132,40 @@ def test_mermaid_block_scales_tall_image_to_fit_page_height():
     assert doc.paragraphs[0].paragraph_format.page_break_before is False
 
 
-def test_mermaid_block_starts_new_page_for_oversized_diagram():
-    """Very tall Mermaid diagrams should be marked to start on a fresh page."""
+def test_large_mermaid_block_does_not_bind_previous_paragraph():
+    """Large Mermaid diagrams should still stay bound to the previous paragraph."""
+    doc = Document()
+    style_manager = StyleManager()
+    style_manager.config.setdefault('mermaid', {}).update({
+        'width': '5.5in',
+        'follow_previous_trigger_height_ratio': 0.10,
+        'oversized_strategy': 'shrink',
+    })
+    renderer = DocxRenderer(doc, style_manager)
+
+    class DummyMermaidConverter:
+        def mermaid_to_image(self, code: str) -> bytes:
+            return _sample_png_bytes_with_size(600, 420)
+
+    renderer.mermaid_converter = DummyMermaidConverter()
+
+    doc.add_paragraph("上一段正文内容")
+
+    token = {
+        'type': 'block_code',
+        'raw': 'graph TD\nA-->B\n',
+        'attrs': {'info': 'mermaid'},
+    }
+
+    renderer.block_code(token, _MockState())
+
+    assert len(doc.paragraphs) == 2
+    assert doc.paragraphs[0].paragraph_format.keep_with_next is True
+    assert int(doc.paragraphs[1].paragraph_format.space_before) > 0
+
+
+def test_mermaid_block_avoids_hard_page_break_for_oversized_diagram_by_default():
+    """Oversized Mermaid diagrams should not force a new page by default."""
     doc = Document()
     style_manager = StyleManager()
     style_manager.config.setdefault('mermaid', {}).update({
@@ -100,6 +173,44 @@ def test_mermaid_block_starts_new_page_for_oversized_diagram():
         'page_break_threshold_ratio': 0.5,
         'page_max_height_ratio': 0.9,
         'oversized_strategy': 'page',
+        'min_readable_width': '3.2in',
+    })
+    renderer = DocxRenderer(doc, style_manager)
+
+    class DummyMermaidConverter:
+        def mermaid_to_image(self, code: str) -> bytes:
+            return _sample_png_bytes_with_size(120, 1200)
+
+    renderer.mermaid_converter = DummyMermaidConverter()
+
+    doc.add_paragraph("上一段正文内容")
+
+    token = {
+        'type': 'block_code',
+        'raw': 'graph TD\nA-->B\n',
+        'attrs': {'info': 'mermaid'},
+    }
+
+    renderer.block_code(token, _MockState())
+
+    assert len(doc.inline_shapes) == 1
+    shape = doc.inline_shapes[0]
+    max_height = int(renderer._get_available_page_height()) * 0.9
+    assert int(shape.height) <= int(max_height)
+    assert doc.paragraphs[0].paragraph_format.keep_with_next is True
+    assert doc.paragraphs[1].paragraph_format.page_break_before is False
+
+
+def test_mermaid_block_can_force_new_page_for_oversized_diagram_when_configured():
+    """Oversized Mermaid diagrams can still request a hard page break explicitly."""
+    doc = Document()
+    style_manager = StyleManager()
+    style_manager.config.setdefault('mermaid', {}).update({
+        'width': '5.5in',
+        'page_break_threshold_ratio': 0.5,
+        'page_max_height_ratio': 0.9,
+        'oversized_strategy': 'page',
+        'force_page_break_before_oversized': True,
         'min_readable_width': '3.2in',
     })
     renderer = DocxRenderer(doc, style_manager)
@@ -119,9 +230,6 @@ def test_mermaid_block_starts_new_page_for_oversized_diagram():
     renderer.block_code(token, _MockState())
 
     assert len(doc.inline_shapes) == 1
-    shape = doc.inline_shapes[0]
-    max_height = int(renderer._get_available_page_height()) * 0.9
-    assert int(shape.height) <= int(max_height)
     assert doc.paragraphs[0].paragraph_format.page_break_before is True
 
 

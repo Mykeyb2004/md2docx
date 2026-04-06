@@ -27,6 +27,7 @@ class DocxRenderer(mistune.BaseRenderer):
         self.styles = style_manager
         self._current_paragraph = None
         self.math_formulas = {'inline': [], 'block': []}  # Will be set by parser
+        self.outline_processing = {'mode': 'auto', 'active': False}
         
         # Initialize math converter for LaTeX formulas
         from md2docx.math_converter import MathConverter
@@ -41,6 +42,11 @@ class DocxRenderer(mistune.BaseRenderer):
             theme=mermaid_style.get('theme'),
             background_color=mermaid_style.get('background_color', 'white'),
             scale=mermaid_style.get('scale'),
+        )
+        self._ordered_abstract_num_id = self._find_list_abstract_num_id(
+            style_id='ListNumber',
+            num_format='decimal',
+            fallback=7,
         )
     
     def _parse_font_size(self, size_str: str) -> int:
@@ -160,6 +166,161 @@ class DocxRenderer(mistune.BaseRenderer):
         section = self.doc.sections[-1]
         return section.page_height - section.top_margin - section.bottom_margin
 
+    def _find_list_abstract_num_id(self, style_id: str, num_format: str, fallback: int) -> int:
+        """
+        Find the numbering template used by a built-in Word list style.
+
+        We clone the built-in abstract numbering definition and create a fresh
+        concrete numbering instance for each Markdown ordered list block. This
+        lets every block restart from 1 instead of continuing the previous one.
+        """
+        numbering = self.doc.part.numbering_part.numbering_definitions._numbering
+
+        matches = numbering.xpath(
+            f'./w:abstractNum[w:lvl/w:pStyle[@w:val="{style_id}"]]/@w:abstractNumId'
+        )
+        if matches:
+            return int(matches[0])
+
+        matches = numbering.xpath(
+            f'./w:abstractNum[w:lvl/w:numFmt[@w:val="{num_format}"]]/@w:abstractNumId'
+        )
+        if matches:
+            return int(matches[0])
+
+        return fallback
+
+    def _create_ordered_list_num_id(self) -> int:
+        """
+        Create a fresh numbering sequence for a single Markdown ordered list block.
+        """
+        numbering = self.doc.part.numbering_part.numbering_definitions._numbering
+        num = numbering.add_num(self._ordered_abstract_num_id)
+        num.add_lvlOverride(ilvl=0).add_startOverride(1)
+        return int(num.numId)
+
+    def _set_paragraph_numbering(self, paragraph: Any, num_id: int, ilvl: int = 0) -> None:
+        """
+        Attach an explicit numbering sequence to a paragraph.
+
+        We intentionally keep `ilvl=0` because the built-in numbering templates
+        shipped with python-docx are single-level. Nested indentation is handled
+        separately via paragraph indentation.
+        """
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+
+        pPr = paragraph._element.get_or_add_pPr()
+        existing_numPr = pPr.find(qn('w:numPr'))
+        if existing_numPr is not None:
+            pPr.remove(existing_numPr)
+
+        numPr = OxmlElement('w:numPr')
+
+        ilvl_elm = OxmlElement('w:ilvl')
+        ilvl_elm.set(qn('w:val'), str(ilvl))
+        numPr.append(ilvl_elm)
+
+        numId_elm = OxmlElement('w:numId')
+        numId_elm.set(qn('w:val'), str(num_id))
+        numPr.append(numId_elm)
+
+        pPr.append(numPr)
+
+    def _outline_mode_active(self) -> bool:
+        """Return True when Chinese outline heading handling is active."""
+        return bool(self.outline_processing.get('active', False))
+
+    def _match_outline_level(self, text: str) -> Optional[int]:
+        """
+        Match Chinese document outline markers at the start of a paragraph.
+
+        Supported levels:
+        1. `一、`
+        2. `（一）`
+        3. `1.`
+        4. `（1）`
+        """
+        stripped = text.strip()
+        patterns = (
+            (1, rf'^[零〇一二三四五六七八九十百千万]+、\s*\S'),
+            (2, rf'^[（(][零〇一二三四五六七八九十百千万]+[）)]\s*\S'),
+            (3, r'^\d+\.\s*\S'),
+            (4, r'^[（(]\d+[）)]\s*\S'),
+        )
+
+        for level, pattern in patterns:
+            if re.match(pattern, stripped):
+                return level
+
+        return None
+
+    def _resolve_style_reference(self, style_name: str) -> Dict[str, Any]:
+        """Resolve a configured style name to a concrete style dictionary."""
+        if style_name == 'paragraph':
+            return self.styles.get_paragraph_style()
+
+        if style_name.startswith('heading'):
+            try:
+                level = int(style_name.replace('heading', ''))
+                return self.styles.get_heading_style(level)
+            except ValueError:
+                pass
+
+        return self.styles.get_style(style_name, self.styles.get_paragraph_style())
+
+    def _get_outline_style(self, level: int) -> Dict[str, Any]:
+        """Get the style used for a detected outline heading level."""
+        outline_config = self.styles.get_style('outline', {})
+        default_style_map = {
+            1: 'heading2',
+            2: 'heading3',
+            3: 'heading4',
+            4: 'paragraph',
+        }
+        style_name = outline_config.get(f'level{level}_style', default_style_map[level])
+        style = dict(self._resolve_style_reference(style_name))
+
+        overrides = outline_config.get(f'level{level}', {})
+        if isinstance(overrides, dict):
+            style.update(overrides)
+
+        return style
+
+    def _apply_text_paragraph_format(self, paragraph: Any, style: Dict[str, Any]) -> None:
+        """Apply alignment, spacing, and indentation to a text paragraph."""
+        if 'alignment' in style:
+            paragraph.alignment = self._get_alignment(style['alignment'])
+
+        if 'line_spacing' in style:
+            paragraph.paragraph_format.line_spacing = style['line_spacing']
+
+        if 'first_line_indent' in style and style['first_line_indent'] > 0:
+            char_count = style['first_line_indent']
+            font_size_pt = self._parse_font_size(style.get('font_size', '12pt'))
+            paragraph.paragraph_format.first_line_indent = Pt(char_count * font_size_pt)
+
+        if 'space_before' in style:
+            paragraph.paragraph_format.space_before = Pt(self._parse_font_size(style['space_before']))
+
+        if 'space_after' in style:
+            paragraph.paragraph_format.space_after = Pt(self._parse_font_size(style['space_after']))
+
+    def _render_outline_paragraph(self, text: str, level: int) -> None:
+        """Render a detected outline heading as a styled paragraph."""
+        style = self._get_outline_style(level)
+        paragraph = self.doc.add_paragraph()
+        self._add_formatted_text(paragraph, text, style)
+
+        if 'bold' in style or 'italic' in style:
+            for run in paragraph.runs:
+                if 'bold' in style:
+                    run.font.bold = style['bold']
+                if 'italic' in style:
+                    run.font.italic = style['italic']
+
+        self._apply_text_paragraph_format(paragraph, style)
+
     def _get_image_pixel_size(self, img_bytes: bytes) -> Tuple[int, int]:
         """Read image pixel dimensions from image bytes."""
         from PIL import Image
@@ -172,7 +333,29 @@ class DocxRenderer(mistune.BaseRenderer):
 
         return width_px, height_px
 
-    def _calculate_mermaid_layout(self, img_bytes: bytes, mermaid_style: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_previous_text_paragraph(self) -> Optional[Any]:
+        """
+        Return the immediate previous paragraph when it contains text.
+
+        This is used for compact Mermaid diagrams that should stay visually
+        attached to the preceding text block while remaining centered on
+        their own line.
+        """
+        if not self.doc.paragraphs:
+            return None
+
+        previous_paragraph = self.doc.paragraphs[-1]
+        if previous_paragraph.text.strip():
+            return previous_paragraph
+
+        return None
+
+    def _calculate_mermaid_layout(
+        self,
+        img_bytes: bytes,
+        mermaid_style: Dict[str, Any],
+        can_follow_previous: bool = False,
+    ) -> Dict[str, Any]:
         """
         Calculate a Mermaid image layout that fits the current page.
 
@@ -216,6 +399,10 @@ class DocxRenderer(mistune.BaseRenderer):
         preferred_height = int(round(preferred_width * aspect_ratio))
         oversized_strategy = str(mermaid_style.get('oversized_strategy', 'page')).lower()
         page_break_before = False
+        page_layout_mode = False
+        force_page_break_before = bool(
+            mermaid_style.get('force_page_break_before_oversized', False)
+        )
 
         target_width = preferred_width
         target_height = preferred_height
@@ -228,14 +415,15 @@ class DocxRenderer(mistune.BaseRenderer):
             preferred_height > page_break_threshold
             or (min_readable_width is not None and target_width < min_readable_width)
         ):
-            page_break_before = True
+            page_layout_mode = True
+            page_break_before = force_page_break_before
             target_height = min(preferred_height, page_max_height)
             target_width = int(round(target_height / aspect_ratio))
 
         # Respect the configured preferred width and current page width.
         target_width = min(target_width, preferred_width, available_width)
 
-        max_target_height = page_max_height if page_break_before else hard_max_height
+        max_target_height = page_max_height if page_layout_mode else hard_max_height
         target_height = int(round(target_width * aspect_ratio))
         if target_height > max_target_height:
             target_height = max_target_height
@@ -248,11 +436,27 @@ class DocxRenderer(mistune.BaseRenderer):
             target_height = max_target_height
             target_width = max(1, int(round(target_height / aspect_ratio)))
 
+        follow_previous_trigger_height = int(
+            available_height * float(mermaid_style.get('follow_previous_trigger_height_ratio', 0.24))
+        )
+        follow_previous = False
+
+        if can_follow_previous and not page_break_before and target_height <= follow_previous_trigger_height:
+            compact_width_ratio = float(mermaid_style.get('follow_previous_width_ratio', 0.55))
+            compact_width = max(1, int(round(available_width * compact_width_ratio)))
+
+            if compact_width < target_width:
+                target_width = compact_width
+                target_height = max(1, int(round(target_width * aspect_ratio)))
+
+            follow_previous = True
+
         return {
             'width': Emu(target_width),
             'height': Emu(target_height),
             'page_break_before': page_break_before,
             'soft_limit_exceeded': target_height > soft_max_height,
+            'follow_previous_paragraph': follow_previous,
         }
 
     def _add_block_image(
@@ -479,6 +683,12 @@ class DocxRenderer(mistune.BaseRenderer):
         # Skip empty paragraphs
         if not text or text.strip() == '':
             return ''
+
+        if self._outline_mode_active():
+            outline_level = self._match_outline_level(text)
+            if outline_level is not None:
+                self._render_outline_paragraph(text.strip(), outline_level)
+                return ''
         
         # Get style configuration
         style = self.styles.get_paragraph_style()
@@ -488,31 +698,7 @@ class DocxRenderer(mistune.BaseRenderer):
         
         # Parse inline formatting (bold, italic)
         self._add_formatted_text(p, text, style)
-        
-        # Apply paragraph alignment
-        if 'alignment' in style:
-            p.alignment = self._get_alignment(style['alignment'])
-        
-        # Apply line spacing
-        if 'line_spacing' in style:
-            p.paragraph_format.line_spacing = style['line_spacing']
-        
-        # Apply first line indent (首行缩进)
-        # 2个字符 = 2倍字体大小
-        if 'first_line_indent' in style and style['first_line_indent'] > 0:
-            char_count = style['first_line_indent']
-            # Get font size from style
-            font_size_pt = self._parse_font_size(style.get('font_size', '12pt'))
-            # 1 character width ≈ 1 * font_size in points
-            p.paragraph_format.first_line_indent = Pt(char_count * font_size_pt)
-        
-        # Apply space before (段前间距)
-        if 'space_before' in style:
-            p.paragraph_format.space_before = Pt(self._parse_font_size(style['space_before']))
-        
-        # Apply space after (段后间距)
-        if 'space_after' in style:
-            p.paragraph_format.space_after = Pt(self._parse_font_size(style['space_after']))
+        self._apply_text_paragraph_format(p, style)
         
         return ''
     
@@ -752,14 +938,29 @@ class DocxRenderer(mistune.BaseRenderer):
             mermaid_style = self.styles.get_mermaid_style()
             try:
                 img_bytes = self.mermaid_converter.mermaid_to_image(code_text)
-                layout = self._calculate_mermaid_layout(img_bytes, mermaid_style)
+                previous_paragraph = self._get_previous_text_paragraph()
+                keep_with_previous = previous_paragraph is not None and bool(
+                    mermaid_style.get('keep_with_previous', True)
+                )
+                layout = self._calculate_mermaid_layout(
+                    img_bytes,
+                    mermaid_style,
+                    can_follow_previous=keep_with_previous,
+                )
+
+                if keep_with_previous and previous_paragraph is not None:
+                    previous_paragraph.paragraph_format.keep_with_next = True
 
                 self._add_block_image(
                     img_bytes,
                     width=layout['width'],
                     height=layout['height'],
                     alignment=mermaid_style.get('alignment', 'center'),
-                    space_before=mermaid_style.get('space_before'),
+                    space_before=(
+                        mermaid_style.get('follow_previous_space_before', '0pt')
+                        if layout.get('follow_previous_paragraph') and keep_with_previous
+                        else mermaid_style.get('space_before')
+                    ),
                     space_after=mermaid_style.get('space_after'),
                     keep_together=mermaid_style.get('keep_together', True),
                     keep_with_next=mermaid_style.get('keep_with_next', False),
@@ -870,22 +1071,27 @@ class DocxRenderer(mistune.BaseRenderer):
         Returns:
             Empty string (content added to document)
         """
-        # Get list style configuration
-        list_style = self.styles.get_list_style()
-        
         # Get list type (ordered/unordered) and depth
         ordered = token['attrs'].get('ordered', False)
-        depth = token.get('tight', 0)  # Use tight as depth indicator for now
+        depth = token.get('attrs', {}).get('depth', 0)
+        list_num_id = self._create_ordered_list_num_id() if ordered else None
         
         # Process each list item
         children = token.get('children', [])
         for child in children:
             if child['type'] == 'list_item':
-                self._render_list_item(child, state, ordered, 0)
+                self._render_list_item(child, state, ordered, depth, list_num_id)
         
         return ''
     
-    def _render_list_item(self, token: Dict[str, Any], state: Any, ordered: bool, depth: int) -> None:
+    def _render_list_item(
+        self,
+        token: Dict[str, Any],
+        state: Any,
+        ordered: bool,
+        depth: int,
+        list_num_id: Optional[int] = None,
+    ) -> None:
         """
         Render a single list item.
         
@@ -932,7 +1138,7 @@ class DocxRenderer(mistune.BaseRenderer):
             if ordered:
                 # Custom number format
                 number_format = list_style.get('number_format', '1.')
-                self._apply_numbered_list(p, number_format, depth)
+                self._apply_numbered_list(p, number_format, depth, list_num_id)
             else:
                 # Custom bullet character
                 bullet_char = list_style.get('bullet_char', '•')
@@ -961,10 +1167,18 @@ class DocxRenderer(mistune.BaseRenderer):
         for nested_list in nested_lists:
             # Get list type from nested list
             nested_ordered = nested_list['attrs'].get('ordered', False)
+            nested_depth = nested_list.get('attrs', {}).get('depth', depth + 1)
+            nested_num_id = self._create_ordered_list_num_id() if nested_ordered else None
             # Process each child of the nested list
             for child in nested_list.get('children', []):
                 if child['type'] == 'list_item':
-                    self._render_list_item(child, state, nested_ordered, depth + 1)
+                    self._render_list_item(
+                        child,
+                        state,
+                        nested_ordered,
+                        nested_depth,
+                        nested_num_id,
+                    )
     
     def _apply_bulleted_list(self, paragraph, bullet_char: str, depth: int):
         """
@@ -1016,7 +1230,13 @@ class DocxRenderer(mistune.BaseRenderer):
             # Use Word's default bullet style
             paragraph.style = 'List Bullet'
     
-    def _apply_numbered_list(self, paragraph, number_format: str, depth: int):
+    def _apply_numbered_list(
+        self,
+        paragraph,
+        number_format: str,
+        depth: int,
+        list_num_id: Optional[int],
+    ):
         """
         Apply custom number format to paragraph.
         
@@ -1024,60 +1244,12 @@ class DocxRenderer(mistune.BaseRenderer):
             paragraph: Paragraph object
             number_format: Number format string (e.g., "1.", "1)", "(1)")
             depth: Nesting depth
+            list_num_id: Concrete numbering instance for this Markdown list block
         """
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-        
-        # Determine format type and suffix
-        if number_format.startswith('(') and number_format.endswith(')'):
-            # Format: (1)
-            prefix = '('
-            suffix = ')'
-        elif number_format.endswith(')'):
-            # Format: 1)
-            prefix = ''
-            suffix = ')'
-        elif number_format.endswith('.'):
-            # Format: 1.
-            prefix = ''
-            suffix = '.'
-        else:
-            # Default
-            prefix = ''
-            suffix = '.'
-        
-        # If using default format "1.", use built-in style
-        if number_format == '1.':
-            paragraph.style = 'List Number'
-        else:
-            # For custom formats, we need to manually track numbering
-            # This is a simplified approach - for production, you'd want
-            # to implement proper numbering tracking
-            
-            # Get or create paragraph properties
-            pPr = paragraph._element.get_or_add_pPr()
-            
-            # Create numbering properties
-            numPr = OxmlElement('w:numPr')
-            
-            # Create indent level
-            ilvl = OxmlElement('w:ilvl')
-            ilvl.set(qn('w:val'), str(depth))
-            numPr.append(ilvl)
-            
-            # Create numbering ID (use 2 for numbers)
-            numId = OxmlElement('w:numId')
-            numId.set(qn('w:val'), '2')
-            numPr.append(numId)
-            
-            # Add to paragraph properties
-            pPr.append(numPr)
-            
-            # Note: For true custom number formats, we'd need to:
-            # 1. Create/modify the numbering.xml part
-            # 2. Define custom abstract numbering definitions
-            # 3. This is complex and beyond basic implementation
-            # For now, we use the built-in numbering with custom display
+        paragraph.style = 'List Number'
+
+        if list_num_id is not None:
+            self._set_paragraph_numbering(paragraph, list_num_id, ilvl=0)
 
     
     def list_item(self, token: Dict[str, Any], state: Any) -> str:
