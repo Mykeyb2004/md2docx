@@ -196,7 +196,7 @@ doc.save('output.docx')
 
 ### 配置文件结构
 
-md2docx 使用 YAML 格式配置文档样式，支持 7 个主要配置节：
+md2docx 使用 YAML 格式配置文档样式。常用结构如下，完整参数见文末链接：
 
 ```yaml
 # 1. 文档级设置
@@ -248,6 +248,14 @@ list:
   font_size: 12pt
   indent_size: 0.5in
   space_after: 3pt
+
+# 7. Mermaid 图样式
+mermaid:
+  width: 5.5in
+  alignment: center
+  follow_previous_trigger_height_ratio: 0.24
+  follow_previous_width_ratio: 0.55
+  follow_previous_space_before: 0pt
 ```
 
 ### 配置文件位置
@@ -267,6 +275,50 @@ list:
 | 五号 | 10.5pt | 小字注释 |
 
 📖 完整配置文档：[样式配置完整指南](docs/STYLES_CONFIG.md)
+
+### Mermaid 小图布局
+
+如果希望 Mermaid 转成图片后，在“图不高”的情况下更紧凑地跟在上一段后面，可以在配置文件里调整 `mermaid` 节：
+
+```yaml
+mermaid:
+  width: 5.5in
+  alignment: center
+  keep_with_previous: true
+  force_page_break_before_oversized: false
+  space_before: 6pt
+  space_after: 6pt
+  follow_previous_trigger_height_ratio: 0.24
+  follow_previous_width_ratio: 0.55
+  follow_previous_space_before: 0pt
+```
+
+参数说明：
+
+- `alignment`
+  Mermaid 图片的段落对齐方式，当前建议保持 `center`，插入时图片会居中。
+- `keep_with_previous`
+  是否默认把 Mermaid 图片与上一段文字做“同页优先”绑定。默认 `true`，这样后续手工缩小图片时，Word 更容易把“上一段 + 图片”重新排到同一页。
+- `force_page_break_before_oversized`
+  超大 Mermaid 图是否强制从新页开始。默认 `false`，避免导出后即使手工缩小图片，仍然被段落级硬分页卡住。
+- `follow_previous_trigger_height_ratio`
+  “小图”判定阈值，按“图片最终高度 / 当前页可用高度”计算。值越大，判定越宽松，更多图会贴近上一段。
+- `follow_previous_width_ratio`
+  命中“小图”规则后，图片最多缩到“当前页可用宽度”的多少。值越大，图更宽；值越小，图更紧凑。
+- `follow_previous_space_before`
+  小图贴靠上一段时的段前距。默认 `0pt`，让图片换行后尽量贴近上一段正文。
+
+推荐取值：
+
+- 更宽松：`follow_previous_trigger_height_ratio: 0.30`，`follow_previous_width_ratio: 0.60`
+- 更严格：`follow_previous_trigger_height_ratio: 0.18`，`follow_previous_width_ratio: 0.45`
+
+说明：
+
+- 这些值是排版经验阈值，不是 Word 的固定规范。
+- 当前实现默认会把 Mermaid 图片和上一段设置为“同页优先”，命中“小图”规则时还会进一步压缩间距和宽度。
+- 如果你确实需要超大图强制从新页开始，可以显式设置 `force_page_break_before_oversized: true`。
+- Word 的最终分页仍由 Word 自己决定，因此这里是强引导，不是逐页精确计算。
 
 ---
 
