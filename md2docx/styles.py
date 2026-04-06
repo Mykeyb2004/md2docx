@@ -1,8 +1,10 @@
 """
 Style management module.
 """
+import sys
 from typing import Dict, Optional, Any
 import yaml
+import pkgutil
 from pathlib import Path
 
 
@@ -48,6 +50,24 @@ class StyleManager:
             "bullet_char": "•",
             "number_format": "1.",
             "indent_size": "0.5in"
+        },
+        "mermaid": {
+            "command": "mmdc",
+            "format": "png",
+            "width": "5.5in",
+            "alignment": "center",
+            "space_before": "6pt",
+            "space_after": "6pt",
+            "background_color": "white",
+            "soft_max_height_ratio": 0.68,
+            "hard_max_height_ratio": 0.82,
+            "page_max_height_ratio": 0.92,
+            "page_break_threshold_ratio": 0.9,
+            "min_readable_width": "3.2in",
+            "oversized_strategy": "page",
+            "keep_together": True,
+            "keep_with_next": False,
+            "widow_control": False,
         }
     }
     
@@ -66,15 +86,44 @@ class StyleManager:
         else:
             # Load default template
             self.config = self._load_default_template()
+
+    @staticmethod
+    def _get_runtime_dir() -> Path:
+        """Return the directory users are expected to place editable config files in."""
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable).resolve().parent
+        return Path.cwd()
+
+    @classmethod
+    def _get_external_template_path(cls, template_name: str) -> Path:
+        """Return the editable template path beside the packaged app."""
+        return cls._get_runtime_dir() / f"{template_name}.yaml"
+
+    @staticmethod
+    def _load_packaged_template(template_name: str) -> Dict[str, Any]:
+        """Load a bundled template shipped with the package."""
+        raw_data = pkgutil.get_data("md2docx", f"templates/{template_name}.yaml")
+        if raw_data is None:
+            raise FileNotFoundError(f"Template '{template_name}' not found")
+
+        config = yaml.safe_load(raw_data.decode("utf-8")) or {}
+        if not isinstance(config, dict):
+            raise ValueError(f"Invalid configuration format in packaged template: {template_name}")
+        return config
     
     def _load_default_template(self) -> Dict[str, Any]:
         """Load default template configuration."""
-        default_template_path = Path(__file__).parent / "templates" / "default.yaml"
-        
-        if default_template_path.exists():
-            with open(default_template_path, 'r', encoding='utf-8') as f:
+        external_template_path = self._get_external_template_path("default")
+
+        if external_template_path.exists():
+            with open(external_template_path, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f) or {}
-        
+
+        try:
+            return self._load_packaged_template("default")
+        except (FileNotFoundError, ValueError):
+            pass
+
         # Fallback to hardcoded defaults
         return self.DEFAULT_CONFIG.copy()
     
@@ -94,12 +143,11 @@ class StyleManager:
         """
         # Check if it's a template name (without path separators)
         if '/' not in config_path and '\\' not in config_path and not config_path.endswith('.yaml'):
-            # It's a template name
-            template_path = Path(__file__).parent / "templates" / f"{config_path}.yaml"
+            template_path = self._get_external_template_path(config_path)
             if template_path.exists():
                 config_path = str(template_path)
             else:
-                raise FileNotFoundError(f"Template '{config_path}' not found")
+                return self._load_packaged_template(config_path)
         
         path = Path(config_path)
         
@@ -191,3 +239,29 @@ class StyleManager:
             Style configuration dictionary
         """
         return self.config.get("code_block", self.DEFAULT_CONFIG.get("code_block", {}))
+
+    def get_mermaid_style(self) -> Dict[str, Any]:
+        """
+        Get Mermaid diagram style configuration.
+
+        Returns:
+            Style configuration dictionary
+        """
+        return self.config.get("mermaid", self.DEFAULT_CONFIG.get("mermaid", {}))
+
+    def get_style(self, style_name: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Get an arbitrary style section by name.
+
+        Args:
+            style_name: Style section key
+            default: Optional fallback when neither config nor defaults contain it
+
+        Returns:
+            Style configuration dictionary
+        """
+        if style_name in self.config:
+            return self.config[style_name]
+        if style_name in self.DEFAULT_CONFIG:
+            return self.DEFAULT_CONFIG[style_name]
+        return default or {}

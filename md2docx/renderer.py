@@ -1,9 +1,9 @@
 """
 Word document renderer module.
 """
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from docx import Document
-from docx.shared import Pt, RGBColor, Inches
+from docx.shared import Pt, RGBColor, Inches, Cm, Mm, Emu
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import re
 import mistune
@@ -30,6 +30,17 @@ class DocxRenderer(mistune.BaseRenderer):
         # Initialize math converter for LaTeX formulas
         from md2docx.math_converter import MathConverter
         self.math_converter = MathConverter(dpi=300)
+
+        # Initialize Mermaid converter for fenced mermaid blocks
+        from md2docx.mermaid_converter import MermaidConverter
+        mermaid_style = self.styles.get_mermaid_style()
+        self.mermaid_converter = MermaidConverter(
+            command=mermaid_style.get('command', 'mmdc'),
+            output_format=mermaid_style.get('format', 'png'),
+            theme=mermaid_style.get('theme'),
+            background_color=mermaid_style.get('background_color', 'white'),
+            scale=mermaid_style.get('scale'),
+        )
     
     def _parse_font_size(self, size_str: str) -> int:
         """
@@ -85,6 +96,209 @@ class DocxRenderer(mistune.BaseRenderer):
             'justify': WD_PARAGRAPH_ALIGNMENT.JUSTIFY,
         }
         return alignment_map.get(alignment_str.lower(), WD_PARAGRAPH_ALIGNMENT.LEFT)
+
+    def _parse_length(self, length_value: Any, default_unit: str = 'pt'):
+        """
+        Parse a length value into a python-docx length object.
+
+        Args:
+            length_value: Length like "5.5in", "12pt", or a numeric value
+            default_unit: Unit to assume for numeric values
+
+        Returns:
+            Parsed python-docx length object
+        """
+        if hasattr(length_value, 'emu'):
+            return length_value
+
+        if isinstance(length_value, (int, float)):
+            value = float(length_value)
+            if default_unit == 'in':
+                return Inches(value)
+            if default_unit == 'cm':
+                return Cm(value)
+            if default_unit == 'mm':
+                return Mm(value)
+            return Pt(value)
+
+        length_str = str(length_value).lower().strip()
+
+        if length_str.endswith('cm'):
+            return Cm(float(length_str[:-2]))
+        if length_str.endswith('in'):
+            return Inches(float(length_str[:-2]))
+        if length_str.endswith('mm'):
+            return Mm(float(length_str[:-2]))
+        if length_str.endswith('pt'):
+            return Pt(float(length_str[:-2]))
+
+        if default_unit == 'in':
+            return Inches(float(length_str))
+        if default_unit == 'cm':
+            return Cm(float(length_str))
+        if default_unit == 'mm':
+            return Mm(float(length_str))
+        return Pt(float(length_str))
+
+    def _get_available_page_width(self):
+        """Get the usable document width after subtracting page margins."""
+        section = self.doc.sections[-1]
+        return section.page_width - section.left_margin - section.right_margin
+
+    def _get_available_page_height(self):
+        """Get the usable document height after subtracting page margins."""
+        section = self.doc.sections[-1]
+        return section.page_height - section.top_margin - section.bottom_margin
+
+    def _get_image_pixel_size(self, img_bytes: bytes) -> Tuple[int, int]:
+        """Read image pixel dimensions from image bytes."""
+        from PIL import Image
+
+        with Image.open(BytesIO(img_bytes)) as image:
+            width_px, height_px = image.size
+
+        if width_px <= 0 or height_px <= 0:
+            raise ValueError("Image has invalid dimensions")
+
+        return width_px, height_px
+
+    def _calculate_mermaid_layout(self, img_bytes: bytes, mermaid_style: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate a Mermaid image layout that fits the current page.
+
+        The image keeps its aspect ratio and is constrained by both
+        available page width and height. Very tall diagrams can be nudged
+        onto a fresh page so Word has more room to place them cleanly.
+        """
+        img_width_px, img_height_px = self._get_image_pixel_size(img_bytes)
+        aspect_ratio = img_height_px / img_width_px
+
+        available_width = int(self._get_available_page_width())
+        available_height = int(self._get_available_page_height())
+
+        preferred_width_value = mermaid_style.get('width')
+        preferred_width = (
+            min(int(self._parse_length(preferred_width_value, default_unit='in')), available_width)
+            if preferred_width_value
+            else available_width
+        )
+
+        soft_max_height = int(
+            available_height * float(mermaid_style.get('soft_max_height_ratio', 0.68))
+        )
+        hard_max_height = int(
+            available_height * float(mermaid_style.get('hard_max_height_ratio', 0.82))
+        )
+        page_max_height = int(
+            available_height * float(mermaid_style.get('page_max_height_ratio', 0.92))
+        )
+        page_break_threshold = int(
+            available_height * float(mermaid_style.get('page_break_threshold_ratio', 0.9))
+        )
+
+        min_readable_width_value = mermaid_style.get('min_readable_width')
+        min_readable_width = (
+            int(self._parse_length(min_readable_width_value, default_unit='in'))
+            if min_readable_width_value
+            else None
+        )
+
+        preferred_height = int(round(preferred_width * aspect_ratio))
+        oversized_strategy = str(mermaid_style.get('oversized_strategy', 'page')).lower()
+        page_break_before = False
+
+        target_width = preferred_width
+        target_height = preferred_height
+
+        if preferred_height > hard_max_height:
+            target_height = hard_max_height
+            target_width = int(round(target_height / aspect_ratio))
+
+        if oversized_strategy == 'page' and (
+            preferred_height > page_break_threshold
+            or (min_readable_width is not None and target_width < min_readable_width)
+        ):
+            page_break_before = True
+            target_height = min(preferred_height, page_max_height)
+            target_width = int(round(target_height / aspect_ratio))
+
+        # Respect the configured preferred width and current page width.
+        target_width = min(target_width, preferred_width, available_width)
+
+        max_target_height = page_max_height if page_break_before else hard_max_height
+        target_height = int(round(target_width * aspect_ratio))
+        if target_height > max_target_height:
+            target_height = max_target_height
+            target_width = int(round(target_height / aspect_ratio))
+
+        target_width = max(1, min(target_width, available_width))
+        target_height = max(1, int(round(target_width * aspect_ratio)))
+
+        if target_height > max_target_height:
+            target_height = max_target_height
+            target_width = max(1, int(round(target_height / aspect_ratio)))
+
+        return {
+            'width': Emu(target_width),
+            'height': Emu(target_height),
+            'page_break_before': page_break_before,
+            'soft_limit_exceeded': target_height > soft_max_height,
+        }
+
+    def _add_block_image(
+        self,
+        img_bytes: bytes,
+        width: Optional[Any] = None,
+        height: Optional[Any] = None,
+        alignment: str = 'center',
+        space_before: Optional[Any] = None,
+        space_after: Optional[Any] = None,
+        keep_together: Optional[bool] = None,
+        keep_with_next: Optional[bool] = None,
+        page_break_before: Optional[bool] = None,
+        widow_control: Optional[bool] = None,
+    ) -> Any:
+        """
+        Add a block image as its own paragraph.
+
+        Args:
+            img_bytes: Image bytes to embed
+            width: Optional target width
+            height: Optional target height
+            alignment: Paragraph alignment
+            space_before: Optional spacing before
+            space_after: Optional spacing after
+            keep_together: Optional paragraph keep-together flag
+            keep_with_next: Optional keep-with-next flag
+            page_break_before: Optional page-break-before flag
+            widow_control: Optional widow control flag
+        """
+        p = self.doc.add_paragraph()
+        p.alignment = self._get_alignment(alignment)
+
+        run = p.add_run()
+        image_kwargs = {}
+        if width is not None:
+            image_kwargs['width'] = width
+        if height is not None:
+            image_kwargs['height'] = height
+        shape = run.add_picture(BytesIO(img_bytes), **image_kwargs)
+
+        if space_before is not None:
+            p.paragraph_format.space_before = self._parse_length(space_before)
+        if space_after is not None:
+            p.paragraph_format.space_after = self._parse_length(space_after)
+
+        if keep_together is not None:
+            p.paragraph_format.keep_together = keep_together
+        if keep_with_next is not None:
+            p.paragraph_format.keep_with_next = keep_with_next
+        if page_break_before is not None:
+            p.paragraph_format.page_break_before = page_break_before
+        if widow_control is not None:
+            p.paragraph_format.widow_control = widow_control
+
+        return p, shape
     
     def _apply_paragraph_style(self, paragraph: Any, style: Dict[str, Any]) -> None:
         """Apply style to paragraph."""
@@ -517,9 +731,35 @@ class DocxRenderer(mistune.BaseRenderer):
         """
         # Get code content
         code_text = token.get('raw', '')
+        attrs = token.get('attrs') or {}
+        language_info = attrs.get('info', '') or ''
+        language = language_info.split(None, 1)[0].lower() if language_info else ''
         
         if not code_text:
             return ''
+
+        if language == 'mermaid':
+            mermaid_style = self.styles.get_mermaid_style()
+            try:
+                img_bytes = self.mermaid_converter.mermaid_to_image(code_text)
+                layout = self._calculate_mermaid_layout(img_bytes, mermaid_style)
+
+                self._add_block_image(
+                    img_bytes,
+                    width=layout['width'],
+                    height=layout['height'],
+                    alignment=mermaid_style.get('alignment', 'center'),
+                    space_before=mermaid_style.get('space_before'),
+                    space_after=mermaid_style.get('space_after'),
+                    keep_together=mermaid_style.get('keep_together', True),
+                    keep_with_next=mermaid_style.get('keep_with_next', False),
+                    page_break_before=layout['page_break_before'],
+                    widow_control=mermaid_style.get('widow_control', False),
+                )
+                return ''
+            except Exception:
+                # Fall back to the existing code block rendering if Mermaid render fails.
+                pass
         
         # Get code block style
         code_style = self.styles.get_code_block_style()
@@ -1071,6 +1311,3 @@ class DocxRenderer(mistune.BaseRenderer):
     def table_cell(self, token: Dict[str, Any], state: Any) -> str:
         """Render table cell (called by render_children)."""
         return ''.join(self.render_children(token, state))
-
-
-
