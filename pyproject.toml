@@ -51,6 +51,9 @@ exclude_lines = [
 ]
 
 [dependency-groups]
+build = [
+    "nuitka>=4.0.7",
+]
 dev = [
     "flake8>=5.0.4",
     "mypy>=1.14.1",

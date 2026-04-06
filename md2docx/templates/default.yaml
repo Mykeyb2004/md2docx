@@ -123,3 +123,22 @@ math_block:
   space_before: 6pt
   space_after: 6pt
   dpi: 300        # 渲染分辨率
+
+# Mermaid diagram style (rendered via Mermaid CLI)
+mermaid:
+  command: mmdc
+  format: png
+  width: 5.5in
+  alignment: center
+  space_before: 6pt
+  space_after: 6pt
+  background_color: white
+  soft_max_height_ratio: 0.68
+  hard_max_height_ratio: 0.82
+  page_max_height_ratio: 0.92
+  page_break_threshold_ratio: 0.90
+  min_readable_width: 3.2in
+  oversized_strategy: page
+  keep_together: true
+  keep_with_next: false
+  widow_control: false

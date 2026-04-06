@@ -82,3 +82,38 @@ def test_load_template_by_name():
     manager = StyleManager(config_path="default")
     assert manager.config is not None
     assert "heading1" in manager.config
+
+
+def test_default_template_prefers_runtime_directory(tmp_path, monkeypatch):
+    """Test default.yaml beside the app overrides the packaged default."""
+    config_path = tmp_path / "default.yaml"
+    config_path.write_text(
+        "heading1:\n"
+        "  font_name: TestFont\n"
+        "paragraph:\n"
+        "  font_name: TestParagraph\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+
+    manager = StyleManager()
+
+    assert manager.config["heading1"]["font_name"] == "TestFont"
+    assert manager.config["paragraph"]["font_name"] == "TestParagraph"
+
+
+def test_named_template_prefers_runtime_directory(tmp_path, monkeypatch):
+    """Test template names resolve to editable files in the runtime directory first."""
+    config_path = tmp_path / "custom.yaml"
+    config_path.write_text(
+        "heading1:\n"
+        "  font_name: RuntimeTemplate\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+
+    manager = StyleManager(config_path="custom")
+
+    assert manager.config["heading1"]["font_name"] == "RuntimeTemplate"
