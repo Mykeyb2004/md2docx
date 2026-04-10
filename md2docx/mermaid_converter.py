@@ -2,11 +2,12 @@
 Mermaid diagram converter using Mermaid CLI.
 """
 import hashlib
+import json
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 class MermaidConverter:
@@ -18,6 +19,7 @@ class MermaidConverter:
         command: str = "mmdc",
         output_format: str = "png",
         theme: Optional[str] = None,
+        theme_variables: Optional[Dict[str, Any]] = None,
         background_color: str = "white",
         scale: Optional[float] = None,
     ) -> None:
@@ -29,12 +31,14 @@ class MermaidConverter:
             command: Mermaid CLI executable name or path
             output_format: Output image format, default is PNG
             theme: Optional Mermaid theme
+            theme_variables: Optional Mermaid theme variables passed via config file
             background_color: Mermaid background color
             scale: Optional Mermaid render scale
         """
         self.command = command
         self.output_format = output_format.lower()
         self.theme = theme
+        self.theme_variables = dict(theme_variables) if theme_variables else None
         self.background_color = background_color
         self.scale = scale
 
@@ -102,7 +106,15 @@ class MermaidConverter:
                 self.background_color,
             ]
 
-            if self.theme:
+            mermaid_config = self._build_mermaid_config()
+            if mermaid_config:
+                config_path = tmp_path / "mermaid-config.json"
+                config_path.write_text(
+                    json.dumps(mermaid_config, ensure_ascii=False, sort_keys=True),
+                    encoding="utf-8",
+                )
+                command.extend(["-c", str(config_path)])
+            elif self.theme:
                 command.extend(["-t", self.theme])
 
             if self.scale:
@@ -121,11 +133,27 @@ class MermaidConverter:
 
             return output_path.read_bytes()
 
+    def _build_mermaid_config(self) -> Dict[str, Any]:
+        """Build an optional Mermaid config file payload."""
+        config: Dict[str, Any] = {}
+
+        if self.theme_variables:
+            # Mermaid applies themeVariables reliably only on the base theme.
+            config["theme"] = "base"
+            config["themeVariables"] = self.theme_variables
+
+        return config
+
     def _get_cache_key(self, code: str) -> str:
         """Generate a cache key from Mermaid source and render options."""
+        theme_variables_key = (
+            json.dumps(self.theme_variables, ensure_ascii=False, sort_keys=True)
+            if self.theme_variables
+            else ""
+        )
         data = (
             f"{code}:{self.command}:{self.output_format}:"
-            f"{self.theme}:{self.background_color}:{self.scale}"
+            f"{self.theme}:{theme_variables_key}:{self.background_color}:{self.scale}"
         )
         return hashlib.md5(data.encode("utf-8")).hexdigest()
 

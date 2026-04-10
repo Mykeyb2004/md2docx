@@ -8,6 +8,7 @@ document:
   margin_left: 3.17cm
   margin_right: 3.17cm
   line_spacing: 1.5
+  ignore_thematic_breaks: true  # true = 忽略 Markdown 分割线，不写入 docx
 
 # Heading styles (levels 1-4)
 heading1:
@@ -111,6 +112,7 @@ list:
   line_spacing: 1.5
   bullet_char: "•"
   number_format: "1."
+  ordered_list_as_text: false  # true = 将 1. 2. 3. 写成普通文本，不使用 Word 自动编号
   indent_size: 0.5in
   space_after: 3pt
 
@@ -130,11 +132,22 @@ math_block:
 mermaid:
   command: mmdc
   format: png
+  theme: base
   width: 5.5in
   alignment: center
   space_before: 6pt
   space_after: 6pt
   background_color: white
+  theme_variables:
+    primaryColor: "#E8F1FF"
+    primaryTextColor: "#163A70"
+    primaryBorderColor: "#2F6BFF"
+    lineColor: "#2F6BFF"
+    secondaryColor: "#F4F9FF"
+    tertiaryColor: "#EEF3F8"
+    clusterBkg: "#F7FBFF"
+    clusterBorder: "#9AB8E8"
+    edgeLabelBackground: "#FFFFFF"
   soft_max_height_ratio: 0.68
   hard_max_height_ratio: 0.82
   page_max_height_ratio: 0.92

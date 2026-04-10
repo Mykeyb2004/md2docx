@@ -48,6 +48,7 @@ document:
   margin_left: 3.17cm     # 左边距
   margin_right: 3.17cm    # 右边距
   line_spacing: 1.5       # 默认行距倍数
+  ignore_thematic_breaks: true  # 是否忽略 Markdown 分割线
 ```
 
 **参数说明**：
@@ -57,6 +58,7 @@ document:
 | `page_size` | 字符串 | `A4` | `A4`, `A3`, `Letter` | 纸张大小 |
 | `margin_top/bottom/left/right` | 字符串 | `2.54cm` | 任意尺寸 + 单位 | 页边距 |
 | `line_spacing` | 数字 | `1.5` | `1.0`, `1.5`, `2.0` | 行距倍数 |
+| `ignore_thematic_breaks` | 布尔值 | `true` | `true`/`false` | 是否忽略 Markdown 分割线（`---`、`***`、`___`） |
 
 ---
 
@@ -313,6 +315,7 @@ list:
   font_size: 12pt      # 字号
   bullet_char: "•"     # 无序列表符号
   number_format: "1."  # 有序列表格式
+  ordered_list_as_text: false  # true=输出“1. 文本”，不用 Word 自动编号
   indent_size: 0.5in   # 每级缩进
   space_after: 3pt     # 列表项后间距
 ```
@@ -325,6 +328,7 @@ list:
 | `font_size` | 字符串 | `12pt` | `10pt`-`14pt` | 字号 |
 | `bullet_char` | 字符串 | `"•"` | `"•"`, `"-"`, `"■"`, `"○"` | 无序列表符号 |
 | `number_format` | 字符串 | `"1."` | `"1."`, `"1)"`, `"(1)"` | 有序列表格式 |
+| `ordered_list_as_text` | 布尔值 | `false` | `true`/`false` | 是否把有序列表写成普通文本序号 |
 | `indent_size` | 字符串 | `0.5in` | 任意尺寸 + 单位 | 每级缩进大小 |
 | `space_after` | 字符串 | `3pt` | 任意尺寸 + `pt` | 列表项后间距 |
 
@@ -338,11 +342,18 @@ list:
 mermaid:
   command: mmdc
   format: png
+  theme: default
   width: 5.5in
   alignment: center
   space_before: 6pt
   space_after: 6pt
   background_color: white
+  # Mermaid recommends pairing themeVariables with theme: base
+  # theme_variables:
+  #   primaryColor: "#E8F1FF"
+  #   primaryTextColor: "#163A70"
+  #   primaryBorderColor: "#2F6BFF"
+  #   lineColor: "#2F6BFF"
   soft_max_height_ratio: 0.68
   hard_max_height_ratio: 0.82
   page_max_height_ratio: 0.92
@@ -365,11 +376,13 @@ mermaid:
 |:-----|:----:|:-------|:-----|
 | `command` | 字符串 | `mmdc` | Mermaid CLI 命令名或路径 |
 | `format` | 字符串 | `png` | 输出图片格式 |
+| `theme` | 字符串 | `default` | Mermaid 内置主题，如 `default`、`dark`、`forest`、`neutral`、`base` |
 | `width` | 字符串 | `5.5in` | Mermaid 图片的首选宽度 |
 | `alignment` | 字符串 | `center` | 图片段落对齐方式，建议保持居中 |
 | `space_before` | 字符串 | `6pt` | 常规 Mermaid 图片的段前距 |
 | `space_after` | 字符串 | `6pt` | Mermaid 图片的段后距 |
 | `background_color` | 字符串 | `white` | Mermaid 导出背景色 |
+| `theme_variables` | 对象 | 空 | 传给 Mermaid CLI 的 `themeVariables`，用于覆写节点、边线、文字等颜色；一旦设置，md2docx 会自动改用 `base` 主题以确保颜色生效 |
 | `soft_max_height_ratio` | 数字 | `0.68` | 软高度上限，占可用页高的比例 |
 | `hard_max_height_ratio` | 数字 | `0.82` | 硬高度上限，超过后会缩放 |
 | `page_max_height_ratio` | 数字 | `0.92` | 需要另起页时允许的最大高度比例 |
@@ -384,6 +397,23 @@ mermaid:
 | `keep_together` | 布尔值 | `true` | 图片段内部尽量保持在一起 |
 | `keep_with_next` | 布尔值 | `false` | 图片段是否与后续段落绑定 |
 | `widow_control` | 布尔值 | `false` | 是否启用孤行控制 |
+
+**颜色主题示例**：
+
+```yaml
+mermaid:
+  theme: base
+  background_color: white
+  theme_variables:
+    primaryColor: "#E8F1FF"
+    primaryTextColor: "#163A70"
+    primaryBorderColor: "#2F6BFF"
+    lineColor: "#2F6BFF"
+    secondaryColor: "#FFF4D6"
+    tertiaryColor: "#F6F8FA"
+```
+
+这类配置会生成 Mermaid CLI 的配置文件并随渲染一起传入。为避免 `themeVariables` 在 `default/dark/forest/neutral` 上失效，md2docx 会自动使用 `base` 主题，然后应用你定义的颜色变量。
 
 **与上一段跟随的行为**：
 

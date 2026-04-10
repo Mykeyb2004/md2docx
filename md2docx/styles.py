@@ -1,6 +1,7 @@
 """
 Style management module.
 """
+import copy
 import sys
 from typing import Dict, Optional, Any
 import yaml
@@ -15,7 +16,8 @@ class StyleManager:
     DEFAULT_CONFIG: Dict[str, Any] = {
         "document": {
             "page_size": "A4",
-            "line_spacing": 1.5
+            "line_spacing": 1.5,
+            "ignore_thematic_breaks": True,
         },
         "heading1": {
             "font_name": "微软雅黑",
@@ -52,11 +54,13 @@ class StyleManager:
         "list": {
             "bullet_char": "•",
             "number_format": "1.",
-            "indent_size": "0.5in"
+            "indent_size": "0.5in",
+            "ordered_list_as_text": False,
         },
         "mermaid": {
             "command": "mmdc",
             "format": "png",
+            "theme": "default",
             "width": "5.5in",
             "alignment": "center",
             "space_before": "6pt",
@@ -107,6 +111,11 @@ class StyleManager:
         """Return the editable template path beside the packaged app."""
         return cls._get_runtime_dir() / f"{template_name}.yaml"
 
+    @classmethod
+    def get_editable_template_path(cls, template_name: str = "default") -> Path:
+        """Return the editable on-disk path for a template."""
+        return cls._get_external_template_path(template_name)
+
     @staticmethod
     def _load_packaged_template(template_name: str) -> Dict[str, Any]:
         """Load a bundled template shipped with the package."""
@@ -118,6 +127,11 @@ class StyleManager:
         if not isinstance(config, dict):
             raise ValueError(f"Invalid configuration format in packaged template: {template_name}")
         return config
+
+    @classmethod
+    def load_packaged_template(cls, template_name: str = "default") -> Dict[str, Any]:
+        """Load a bundled template configuration."""
+        return cls._load_packaged_template(template_name)
     
     def _load_default_template(self) -> Dict[str, Any]:
         """Load default template configuration."""
@@ -133,7 +147,7 @@ class StyleManager:
             pass
 
         # Fallback to hardcoded defaults
-        return self.DEFAULT_CONFIG.copy()
+        return copy.deepcopy(self.DEFAULT_CONFIG)
     
     def load_config(self, config_path: str) -> Dict[str, Any]:
         """

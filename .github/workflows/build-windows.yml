@@ -1,0 +1,79 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+    inputs:
+      entry:
+        description: Build target
+        required: true
+        type: choice
+        default: gui
+        options:
+          - gui
+          - cli
+      mode:
+        description: Nuitka mode
+        required: true
+        type: choice
+        default: onefile
+        options:
+          - onefile
+          - standalone
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          architecture: "x64"
+
+      - name: Build Windows binary
+        run: |
+          PYTHON_BIN="$(python -c 'import sys; print(sys.executable)')"
+          uv run --python "$PYTHON_BIN" --group build --with zstandard \
+            python scripts/build_nuitka.py \
+            --entry "${{ inputs.entry }}" \
+            --mode "${{ inputs.mode }}" \
+            --clean
+
+      - name: Prepare artifact
+        run: |
+          entry="${{ inputs.entry }}"
+          mode="${{ inputs.mode }}"
+          artifact_dir="build/artifacts/${entry}-${mode}"
+
+          mkdir -p "$artifact_dir"
+
+          if [ "$mode" = "onefile" ]; then
+            cp build/nuitka/default.yaml "$artifact_dir/default.yaml"
+            cp "build/nuitka/md2docx-${entry}.exe" "$artifact_dir/"
+          else
+            cp -R "build/nuitka/md2docx-${entry}.dist" "$artifact_dir/"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: md2docx-windows-${{ inputs.entry }}-${{ inputs.mode }}
+          path: build/artifacts/${{ inputs.entry }}-${{ inputs.mode }}
+          if-no-files-found: error
+          retention-days: 7
