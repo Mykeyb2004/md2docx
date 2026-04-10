@@ -188,3 +188,75 @@ def test_ordered_lists_restart_numbering_between_blocks():
         assert numbered_paragraphs['丙事项'] != numbered_paragraphs['甲事项']
     finally:
         Path(output_path).unlink(missing_ok=True)
+
+
+def test_loose_ordered_lists_keep_word_numbering():
+    """Loose ordered lists should still render as numbered Word paragraphs."""
+    converter = Converter()
+
+    md_content = """# 松散编号列表
+
+1. 第一项
+
+2. 第二项
+
+3. 第三项
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter.convert_string(md_content, output_path)
+        numbering = {
+            text: num_id for text, num_id in _read_paragraph_numbering(output_path)
+        }
+
+        assert numbering['第一项'] is not None
+        assert numbering['第二项'] == numbering['第一项']
+        assert numbering['第三项'] == numbering['第一项']
+    finally:
+        Path(output_path).unlink(missing_ok=True)
+
+
+def test_ordered_lists_can_render_as_literal_text():
+    """Ordered lists can be emitted as plain text markers instead of Word numbering."""
+    md_content = """# 文本编号
+
+1. 第一项
+
+2. 第二项
+
+3. 第三项
+"""
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False, encoding='utf-8') as f:
+        style_path = f.name
+        f.write(
+            "list:\n"
+            "  ordered_list_as_text: true\n"
+            "  number_format: \"1.\"\n"
+        )
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter = Converter(style_config=style_path)
+        converter.convert_string(md_content, output_path)
+
+        doc = Document(output_path)
+        texts = [p.text for p in doc.paragraphs]
+        assert '1. 第一项' in texts
+        assert '2. 第二项' in texts
+        assert '3. 第三项' in texts
+
+        numbering = {
+            text: num_id for text, num_id in _read_paragraph_numbering(output_path)
+        }
+        assert numbering['1. 第一项'] is None
+        assert numbering['2. 第二项'] is None
+        assert numbering['3. 第三项'] is None
+    finally:
+        Path(output_path).unlink(missing_ok=True)
+        Path(style_path).unlink(missing_ok=True)

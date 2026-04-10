@@ -40,6 +40,7 @@ class DocxRenderer(mistune.BaseRenderer):
             command=mermaid_style.get('command', 'mmdc'),
             output_format=mermaid_style.get('format', 'png'),
             theme=mermaid_style.get('theme'),
+            theme_variables=mermaid_style.get('theme_variables'),
             background_color=mermaid_style.get('background_color', 'white'),
             scale=mermaid_style.get('scale'),
         )
@@ -1055,6 +1056,10 @@ class DocxRenderer(mistune.BaseRenderer):
     
     def thematic_break(self, token: Dict[str, Any], state: Any) -> str:
         """Render horizontal rule."""
+        document_style = self.styles.get_document_style()
+        if document_style.get('ignore_thematic_breaks', True):
+            return ''
+
         # Add a paragraph with a horizontal line
         p = self.doc.add_paragraph()
         p.add_run('_' * 50)
@@ -1078,9 +1083,16 @@ class DocxRenderer(mistune.BaseRenderer):
         
         # Process each list item
         children = token.get('children', [])
-        for child in children:
+        for item_number, child in enumerate(children, start=1):
             if child['type'] == 'list_item':
-                self._render_list_item(child, state, ordered, depth, list_num_id)
+                self._render_list_item(
+                    child,
+                    state,
+                    ordered,
+                    depth,
+                    list_num_id,
+                    item_number,
+                )
         
         return ''
     
@@ -1091,6 +1103,7 @@ class DocxRenderer(mistune.BaseRenderer):
         ordered: bool,
         depth: int,
         list_num_id: Optional[int] = None,
+        item_number: int = 1,
     ) -> None:
         """
         Render a single list item.
@@ -1112,8 +1125,14 @@ class DocxRenderer(mistune.BaseRenderer):
             else:
                 inline_children.append(child)
         
-        # Get text from inline children only
-        text = ''.join([self.render_token(child, state) for child in inline_children])
+        # Get text from inline children only. Loose Markdown lists wrap item
+        # content in paragraph tokens; rendering those directly would create a
+        # Normal paragraph before list formatting can be applied.
+        text_parts = [
+            self._render_list_item_text(child, state)
+            for child in inline_children
+        ]
+        text = '\n'.join(part.strip() for part in text_parts if part and part.strip())
         
         # Only skip if there's no inline text AND no nested lists
         if (not text or text.strip() == '') and not nested_lists:
@@ -1123,6 +1142,8 @@ class DocxRenderer(mistune.BaseRenderer):
         if text and text.strip():
             # Get list style
             list_style = self.styles.get_list_style()
+            number_format = list_style.get('number_format', '1.')
+            ordered_list_as_text = bool(list_style.get('ordered_list_as_text', False))
             
             # Add paragraph with appropriate style
             p = self.doc.add_paragraph()
@@ -1132,17 +1153,21 @@ class DocxRenderer(mistune.BaseRenderer):
                 'font_name': list_style.get('font_name', '宋体'),
                 'font_size': list_style.get('font_size', '12pt')
             }
-            self._add_formatted_text(p, text, base_style)
+            if ordered and ordered_list_as_text:
+                marker = self._format_ordered_list_marker(item_number, number_format)
+                self._add_formatted_text(p, f'{marker} {text}', base_style)
+            else:
+                self._add_formatted_text(p, text, base_style)
             
             # Apply custom list formatting
-            if ordered:
+            if ordered and not ordered_list_as_text:
                 # Custom number format
-                number_format = list_style.get('number_format', '1.')
                 self._apply_numbered_list(p, number_format, depth, list_num_id)
             else:
                 # Custom bullet character
-                bullet_char = list_style.get('bullet_char', '•')
-                self._apply_bulleted_list(p, bullet_char, depth)
+                if not ordered:
+                    bullet_char = list_style.get('bullet_char', '•')
+                    self._apply_bulleted_list(p, bullet_char, depth)
             
             # Apply indentation for nested lists
             if depth > 0:
@@ -1170,7 +1195,7 @@ class DocxRenderer(mistune.BaseRenderer):
             nested_depth = nested_list.get('attrs', {}).get('depth', depth + 1)
             nested_num_id = self._create_ordered_list_num_id() if nested_ordered else None
             # Process each child of the nested list
-            for child in nested_list.get('children', []):
+            for nested_item_number, child in enumerate(nested_list.get('children', []), start=1):
                 if child['type'] == 'list_item':
                     self._render_list_item(
                         child,
@@ -1178,7 +1203,32 @@ class DocxRenderer(mistune.BaseRenderer):
                         nested_ordered,
                         nested_depth,
                         nested_num_id,
+                        nested_item_number,
                     )
+
+    def _render_list_item_text(self, token: Dict[str, Any], state: Any) -> str:
+        """
+        Render list-item child content without writing a standalone paragraph.
+
+        Mistune emits `block_text` for tight lists and `paragraph` for loose
+        lists. Both should feed the list item paragraph instead of being
+        rendered independently.
+        """
+        if token['type'] in {'paragraph', 'block_text'}:
+            return ''.join(self.render_children(token, state))
+
+        return self.render_token(token, state)
+
+    def _format_ordered_list_marker(self, item_number: int, number_format: str) -> str:
+        """
+        Format a literal ordered-list marker using the configured pattern.
+
+        Supported examples: `1.`, `1)`, `(1)`.
+        """
+        fmt = str(number_format or '1.').strip()
+        if '1' in fmt:
+            return fmt.replace('1', str(item_number), 1)
+        return f'{item_number}.'
     
     def _apply_bulleted_list(self, paragraph, bullet_char: str, depth: int):
         """

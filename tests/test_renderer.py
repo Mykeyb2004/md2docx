@@ -88,3 +88,32 @@ def test_render_children():
     result = renderer.render_children(token, MockState())
     assert result == ['Hello ', 'World']
 
+
+def test_thematic_break_is_ignored_by_default():
+    """Markdown horizontal rules should be skipped by default."""
+    doc = Document()
+    style_manager = StyleManager()
+    renderer = DocxRenderer(doc, style_manager)
+
+    class MockState:
+        pass
+
+    renderer.thematic_break({"type": "thematic_break"}, MockState())
+
+    assert len(doc.paragraphs) == 0
+
+
+def test_thematic_break_can_be_rendered_when_enabled():
+    """Users can opt back into thematic break output via config."""
+    doc = Document()
+    style_manager = StyleManager()
+    style_manager.config.setdefault("document", {})["ignore_thematic_breaks"] = False
+    renderer = DocxRenderer(doc, style_manager)
+
+    class MockState:
+        pass
+
+    renderer.thematic_break({"type": "thematic_break"}, MockState())
+
+    assert len(doc.paragraphs) == 1
+    assert doc.paragraphs[0].text == "_" * 50

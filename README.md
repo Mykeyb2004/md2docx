@@ -246,11 +246,14 @@ table:
 list:
   font_name: "仿宋"
   font_size: 12pt
+  number_format: "1."
+  ordered_list_as_text: false
   indent_size: 0.5in
   space_after: 3pt
 
 # 7. Mermaid 图样式
 mermaid:
+  theme: default
   width: 5.5in
   alignment: center
   follow_previous_trigger_height_ratio: 0.24
@@ -282,6 +285,7 @@ mermaid:
 
 ```yaml
 mermaid:
+  theme: default
   width: 5.5in
   alignment: center
   keep_with_previous: true
@@ -297,6 +301,8 @@ mermaid:
 
 - `alignment`
   Mermaid 图片的段落对齐方式，当前建议保持 `center`，插入时图片会居中。
+- `theme`
+  Mermaid 内置主题名，可设为 `default`、`dark`、`forest`、`neutral`、`base`。
 - `keep_with_previous`
   是否默认把 Mermaid 图片与上一段文字做“同页优先”绑定。默认 `true`，这样后续手工缩小图片时，Word 更容易把“上一段 + 图片”重新排到同一页。
 - `force_page_break_before_oversized`
@@ -307,6 +313,29 @@ mermaid:
   命中“小图”规则后，图片最多缩到“当前页可用宽度”的多少。值越大，图更宽；值越小，图更紧凑。
 - `follow_previous_space_before`
   小图贴靠上一段时的段前距。默认 `0pt`，让图片换行后尽量贴近上一段正文。
+
+### Mermaid 颜色主题
+
+如果你希望 Mermaid 导出的图片使用自定义配色，可以在 `mermaid` 节里设置内置主题，或者继续传入 `theme_variables`：
+
+```yaml
+mermaid:
+  theme: base
+  background_color: white
+  theme_variables:
+    primaryColor: "#E8F1FF"
+    primaryTextColor: "#163A70"
+    primaryBorderColor: "#2F6BFF"
+    lineColor: "#2F6BFF"
+    secondaryColor: "#FFF4D6"
+    tertiaryColor: "#F6F8FA"
+```
+
+说明：
+
+- 只想切换现成风格时，直接改 `theme` 即可。
+- 想细调节点、边框、文字、连线颜色时，使用 `theme_variables`。
+- 只要设置了 `theme_variables`，md2docx 会自动切到 Mermaid 的 `base` 主题，因为 Mermaid 只会在 `base` 主题上稳定应用这些颜色变量。
 
 推荐取值：
 

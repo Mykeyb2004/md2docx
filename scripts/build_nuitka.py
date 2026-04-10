@@ -16,6 +16,13 @@ OUTPUT_DIR = REPO_ROOT / "build" / "nuitka"
 DEFAULT_TEMPLATE = REPO_ROOT / "md2docx" / "templates" / "default.yaml"
 
 
+def executable_name(binary_name: str) -> str:
+    """Return the platform-specific executable filename."""
+    if sys.platform == "win32":
+        return f"{binary_name}.exe"
+    return binary_name
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -76,10 +83,11 @@ def build_target(entry: str, mode: str, clean: bool) -> Path:
 
     subprocess.run(command, check=True, cwd=REPO_ROOT, env=env)
 
+    target_name = executable_name(binary_name)
     if mode == "onefile":
-        return OUTPUT_DIR / binary_name
+        return OUTPUT_DIR / target_name
 
-    return OUTPUT_DIR / f"{binary_name}.dist" / binary_name
+    return OUTPUT_DIR / f"{binary_name}.dist" / target_name
 
 
 def copy_editable_default_config(executable_path: Path) -> Path:
