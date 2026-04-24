@@ -17,7 +17,7 @@
 
 ## 配置文件概述
 
-`md2docx` 使用 **YAML 格式**的配置文件定义 Word 文档样式。配置文件包含以下 10 个配置节/配置组：
+`md2docx` 使用 **YAML 格式**的配置文件定义 Word 文档样式。配置文件包含以下 11 个配置节/配置组：
 
 | 配置节 | 说明 | 必需 |
 |:------|:-----|:----:|
@@ -31,10 +31,45 @@
 | `math_inline` | 行内公式图片样式 | ⭕ |
 | `math_block` | 块级公式图片样式 | ⭕ |
 | `mermaid` | Mermaid 图片样式与分页策略 | ⭕ |
+| `chapter_scan` | 输出章节 `.md` 的排版异常扫描设置 | ⭕ |
 
 ---
 
 ## 配置节说明
+
+### 0️⃣ chapter_scan - 章节扫描
+
+控制独立扫描脚本 `scripts/scan_chapter_issues.py` 的默认检查目录和匹配范围。
+
+```yaml
+chapter_scan:
+  target_dir: output
+  glob: "*.md"
+  recursive: true
+```
+
+**参数说明**：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|:-----|:----:|:-------|:-----|
+| `target_dir` | 字符串 | `output` | 默认扫描目录；相对路径按当前配置文件位置解析 |
+| `glob` | 字符串 | `*.md` | 需要扫描的文件匹配模式 |
+| `recursive` | 布尔值 | `true` | 是否递归扫描子目录 |
+
+**使用方式**：
+
+```bash
+# 默认读取当前 default.yaml 中的 chapter_scan.target_dir
+uv run python scripts/scan_chapter_issues.py
+
+# 指定配置文件
+uv run python scripts/scan_chapter_issues.py --config custom_styles.yaml
+
+# 使用正式 CLI 命令
+uv run md2docx-scan-chapters --config custom_styles.yaml
+```
+
+---
 
 ### 1️⃣ document - 文档设置
 

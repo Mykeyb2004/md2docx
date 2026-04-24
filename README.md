@@ -259,12 +259,45 @@ mermaid:
   follow_previous_trigger_height_ratio: 0.24
   follow_previous_width_ratio: 0.55
   follow_previous_space_before: 0pt
+
+# 8. 章节扫描配置
+chapter_scan:
+  target_dir: output
+  glob: "*.md"
+  recursive: true
 ```
 
 ### 配置文件位置
 
 - **默认配置**: `md2docx/templates/default.yaml`
 - **自定义配置**: 任意路径的 `.yaml` 文件
+
+### 章节排版异常扫描
+
+用于扫描输出目录中的章节 `.md` 文件，定位“序号单独成行、与后续小标题或段首正文拆开”的问题。
+
+```bash
+# 默认读取当前 default.yaml 中的 chapter_scan.target_dir
+uv run python scripts/scan_chapter_issues.py
+
+# 指定配置文件
+uv run python scripts/scan_chapter_issues.py --config custom_styles.yaml
+
+# 临时覆盖扫描目录
+uv run python scripts/scan_chapter_issues.py --target-dir output/chapters
+```
+
+也可以直接使用正式 CLI 命令：
+
+```bash
+# 在项目目录内
+uv run md2docx-scan-chapters --config config_统计台账.yaml
+
+# 在任意目录
+uv run --project /Users/zhangqijin/PycharmProjects/md2docx \
+  md2docx-scan-chapters \
+  --config /绝对路径/config_统计台账.yaml
+```
 
 ### 中文字号对照
 
