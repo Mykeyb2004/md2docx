@@ -152,12 +152,32 @@ class MarkdownParser:
                 processed_lines.append(line)
                 continue
 
-            if OUTLINE_LEVEL3_RE.match(line) and self._should_escape_outline_number(lines, idx, mode):
+            is_outline_heading = self._is_outline_heading_line(lines, idx, mode)
+
+            if OUTLINE_LEVEL3_RE.match(line) and is_outline_heading:
                 line = re.sub(r'^(\s*\d+)\.', r'\1\\.', line, count=1)
+
+            if is_outline_heading and processed_lines and processed_lines[-1].strip():
+                processed_lines.append('')
 
             processed_lines.append(line)
 
+            if is_outline_heading and idx + 1 < len(lines) and lines[idx + 1].strip():
+                processed_lines.append('')
+
         return '\n'.join(processed_lines)
+
+    def _is_outline_heading_line(self, lines: List[str], index: int, mode: str) -> bool:
+        """Return True when a line should be treated as an isolated outline heading."""
+        line = lines[index]
+
+        if OUTLINE_LEVEL1_RE.match(line) or OUTLINE_LEVEL2_RE.match(line) or OUTLINE_LEVEL4_RE.match(line):
+            return True
+
+        if OUTLINE_LEVEL3_RE.match(line):
+            return self._should_escape_outline_number(lines, index, mode)
+
+        return False
 
     def _should_escape_outline_number(self, lines: List[str], index: int, mode: str) -> bool:
         """Return True when an isolated `1.` line is more like an outline heading."""
