@@ -80,7 +80,12 @@ class StyleManager:
             "keep_together": True,
             "keep_with_next": False,
             "widow_control": False,
-        }
+        },
+        "chapter_scan": {
+            "target_dir": "output",
+            "glob": "*.md",
+            "recursive": True,
+        },
     }
     
     def __init__(self, config_path: Optional[str] = None) -> None:

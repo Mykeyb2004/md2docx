@@ -162,3 +162,9 @@ mermaid:
   keep_together: true
   keep_with_next: false
   widow_control: false
+
+# Chapter post-check scan settings
+chapter_scan:
+  target_dir: output
+  glob: "*.md"
+  recursive: true
