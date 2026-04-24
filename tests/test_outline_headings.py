@@ -106,3 +106,38 @@ def test_standard_markdown_ordered_lists_still_use_word_numbering():
         assert numbering['第三项'] == numbering['第一项']
     finally:
         Path(output_path).unlink(missing_ok=True)
+
+
+def test_outline_markers_without_blank_lines_still_split_into_paragraphs():
+    """Escaped outline markers should remain separate paragraphs, not merge inline."""
+    converter = Converter()
+
+    md_content = """（二）统计系统平台操作与数据流转机制
+1. 省级统计平台功能适配与数据接口规范
+杭州菲尔德咨询针对浙江省文化广电和旅游统计信息化平台，已完成平台功能模块适配与技术接口对接分析。
+
+2. 基层数据采集、审核与汇总闭环流程
+杭州菲尔德咨询基于省级统计平台功能，构建基层数据采集、审核与汇总全流程闭环管理机制。
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter.convert_string(md_content, output_path)
+        doc = Document(output_path)
+        texts = [p.text for p in doc.paragraphs if p.text.strip()]
+
+        assert '（二）统计系统平台操作与数据流转机制' in texts
+        assert '1. 省级统计平台功能适配与数据接口规范' in texts
+        assert (
+            '杭州菲尔德咨询针对浙江省文化广电和旅游统计信息化平台，已完成平台功能模块适配与技术接口对接分析。'
+            in texts
+        )
+        assert '2. 基层数据采集、审核与汇总闭环流程' in texts
+        assert (
+            '杭州菲尔德咨询基于省级统计平台功能，构建基层数据采集、审核与汇总全流程闭环管理机制。'
+            in texts
+        )
+    finally:
+        Path(output_path).unlink(missing_ok=True)
