@@ -1,10 +1,11 @@
 """
 Markdown to Word converter.
 """
-from typing import Optional
+from typing import Any, Dict, Optional
 from pathlib import Path
 from docx import Document
 
+from md2docx.config_utils import merge_config
 from md2docx.styles import StyleManager
 from md2docx.parser import MarkdownParser
 
@@ -15,7 +16,8 @@ class Converter:
     def __init__(
         self,
         template: Optional[str] = None,
-        style_config: Optional[str] = None
+        style_config: Optional[str] = None,
+        config_override: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Initialize converter.
@@ -23,13 +25,20 @@ class Converter:
         Args:
             template: Name of predefined style template
             style_config: Path to custom YAML style configuration
+            config_override: Runtime config overrides merged over the loaded style config
         """
         self.template = template
         self.style_config = style_config
+        self.config_override = config_override or {}
         
         # Initialize style manager
         config_path = style_config or template
         self.style_manager = StyleManager(config_path)
+        if self.config_override:
+            self.style_manager.config = merge_config(
+                self.style_manager.config,
+                self.config_override,
+            )
         
         # Initialize parser
         self.parser = MarkdownParser(self.style_manager)

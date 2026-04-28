@@ -18,6 +18,7 @@ class StyleManager:
             "page_size": "A4",
             "line_spacing": 1.5,
             "ignore_thematic_breaks": True,
+            "auto_fix_tables": False,
         },
         "heading1": {
             "font_name": "微软雅黑",

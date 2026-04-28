@@ -505,6 +505,7 @@ class Md2docxGUI:
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
         self.default_config_path = StyleManager.get_editable_template_path("default")
         self.config_editor: Optional[ConfigEditorWindow] = None
+        self.auto_fix_tables_var = tk.BooleanVar(value=self.load_auto_fix_tables_setting())
 
         self.history = self.load_history()
 
@@ -576,11 +577,18 @@ class Md2docxGUI:
         )
         output_btn.grid(row=1, column=2, padx=5)
 
+        table_fix_toggle = ttk.Checkbutton(
+            conv_frame,
+            text="自动修复不规范表格（补 separator）",
+            variable=self.auto_fix_tables_var,
+        )
+        table_fix_toggle.grid(row=2, column=1, columnspan=2, sticky=tk.W, padx=5, pady=(6, 0))
+
         self.progress = ttk.Progressbar(conv_frame, mode="indeterminate", length=240)
-        self.progress.grid(row=2, column=0, pady=(15, 0), sticky=(tk.W, tk.E))
+        self.progress.grid(row=3, column=0, pady=(15, 0), sticky=(tk.W, tk.E))
 
         action_frame = ttk.Frame(conv_frame)
-        action_frame.grid(row=2, column=1, columnspan=2, pady=(15, 0), sticky=tk.E)
+        action_frame.grid(row=3, column=1, columnspan=2, pady=(15, 0), sticky=tk.E)
 
         ttk.Button(
             action_frame,
@@ -689,7 +697,28 @@ class Md2docxGUI:
 
     def on_config_saved(self, config_path: Path) -> None:
         """Handle successful config saves from the popup."""
+        self.auto_fix_tables_var.set(self.load_auto_fix_tables_setting())
         self.status_var.set(f"Default config saved: {config_path}")
+
+    def load_auto_fix_tables_setting(self) -> bool:
+        """Load the current default value for malformed-table auto-fixing."""
+        config = StyleManager.load_packaged_template("default")
+
+        if self.default_config_path.exists():
+            try:
+                config = merge_config(config, load_yaml_config(self.default_config_path))
+            except Exception:
+                pass
+
+        return bool(config.get("document", {}).get("auto_fix_tables", False))
+
+    def build_runtime_config_override(self) -> Dict[str, Any]:
+        """Build per-run config overrides from the main GUI switches."""
+        return {
+            "document": {
+                "auto_fix_tables": bool(self.auto_fix_tables_var.get()),
+            }
+        }
 
     def convert_file(self) -> None:
         """Convert Markdown file to Word document."""
@@ -717,11 +746,15 @@ class Md2docxGUI:
         try:
             self.root.after(0, self.progress.start)
             self.root.after(0, lambda: self.status_var.set("Converting..."))
+            config_override = self.build_runtime_config_override()
 
             if self.default_config_path.exists():
-                converter = Converter(style_config=str(self.default_config_path))
+                converter = Converter(
+                    style_config=str(self.default_config_path),
+                    config_override=config_override,
+                )
             else:
-                converter = Converter()
+                converter = Converter(config_override=config_override)
 
             converter.convert(input_file, output_file)
 
