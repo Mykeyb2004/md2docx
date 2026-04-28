@@ -129,3 +129,82 @@ def test_table_header_is_centered_both_horizontally_and_vertically():
         assert header_cell.vertical_alignment == WD_CELL_VERTICAL_ALIGNMENT.CENTER
     finally:
         Path(output_path).unlink(missing_ok=True)
+
+
+def test_missing_separator_table_is_not_auto_fixed_by_default():
+    """Malformed pipe blocks should stay plain text unless auto-fix is enabled."""
+    converter = Converter()
+
+    md_content = """
+表格标题
+| 列1 | 列2 | 列3 |
+| A | B | C |
+| D | E | F |
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter.convert_string(md_content, output_path)
+        doc = Document(output_path)
+
+        assert len(doc.tables) == 0
+        assert any('|' in p.text for p in doc.paragraphs)
+    finally:
+        Path(output_path).unlink(missing_ok=True)
+
+
+def test_missing_separator_table_can_be_auto_fixed_when_enabled():
+    """Auto-fix should insert a separator row for high-confidence malformed tables."""
+    converter = Converter(config_override={"document": {"auto_fix_tables": True}})
+
+    md_content = """
+表格标题
+| 列1 | 列2 | 列3 |
+| A | B | C |
+| D | E | F |
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter.convert_string(md_content, output_path)
+        doc = Document(output_path)
+
+        assert len(doc.tables) == 1
+        table = doc.tables[0]
+        assert len(table.rows) == 3
+        assert table.rows[0].cells[0].text == "列1"
+        assert table.rows[1].cells[1].text == "B"
+        assert not any('| 列1 | 列2 | 列3 |' in p.text for p in doc.paragraphs)
+    finally:
+        Path(output_path).unlink(missing_ok=True)
+
+
+def test_captioned_malformed_table_can_be_split_and_fixed():
+    """Single-cell caption lines should be preserved as text before the repaired table."""
+    converter = Converter(config_override={"document": {"auto_fix_tables": True}})
+
+    md_content = """
+| 名录库维护关键节点与交付对照表 |
+| 维护阶段 | 核心任务 | 输出成果 |
+| 数据采集与清洗 | 跨源提取 | 清洗后基础数据集 |
+| 数据审核与逻辑校验 | 表内表间逻辑比对 | 审核报告与异常工单 |
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter.convert_string(md_content, output_path)
+        doc = Document(output_path)
+
+        assert len(doc.tables) == 1
+        assert any(p.text == "名录库维护关键节点与交付对照表" for p in doc.paragraphs)
+        table = doc.tables[0]
+        assert table.rows[0].cells[0].text == "维护阶段"
+        assert table.rows[1].cells[2].text == "清洗后基础数据集"
+    finally:
+        Path(output_path).unlink(missing_ok=True)

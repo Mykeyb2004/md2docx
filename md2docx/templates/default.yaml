@@ -9,6 +9,7 @@ document:
   margin_right: 3.17cm
   line_spacing: 1.5
   ignore_thematic_breaks: true  # true = 忽略 Markdown 分割线，不写入 docx
+  auto_fix_tables: false  # true = 自动修复缺少 separator 的不规范 Markdown 表格
 
 # Heading styles (levels 1-4)
 heading1:
@@ -49,6 +50,12 @@ heading4:
   space_after: 3pt
   alignment: left
   first_line_indent: 2
+
+# Chinese outline heading overrides
+outline:
+  # level2 = （一）
+  level2:
+    bold: false
 
 # Paragraph style
 paragraph:
