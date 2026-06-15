@@ -1,7 +1,7 @@
 """
 Markdown to Word converter.
 """
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from pathlib import Path
 from docx import Document
 
@@ -65,21 +65,27 @@ class Converter:
             md_content = f.read()
         
         # Convert to Word
-        self.convert_string(md_content, docx_path)
+        self.convert_string(md_content, docx_path, base_dir=md_file.parent)
     
-    def convert_string(self, md_content: str, docx_path: str) -> None:
+    def convert_string(
+        self,
+        md_content: str,
+        docx_path: str,
+        base_dir: Optional[Union[str, Path]] = None,
+    ) -> None:
         """
         Convert Markdown string to Word document.
         
         Args:
             md_content: Markdown content as string
             docx_path: Path to output Word document
+            base_dir: Directory used to resolve relative image paths
             
         Raises:
             IOError: If there's an error writing the file
         """
         # Create document
-        doc = self.to_document(md_content)
+        doc = self.to_document(md_content, base_dir=base_dir)
         
         # Save document
         output_path = Path(docx_path)
@@ -87,12 +93,17 @@ class Converter:
         
         doc.save(str(output_path))
     
-    def to_document(self, md_content: str) -> Document:
+    def to_document(
+        self,
+        md_content: str,
+        base_dir: Optional[Union[str, Path]] = None,
+    ) -> Document:
         """
         Convert Markdown string to Document object.
         
         Args:
             md_content: Markdown content as string
+            base_dir: Directory used to resolve relative image paths
             
         Returns:
             python-docx Document object
@@ -107,7 +118,7 @@ class Converter:
         self._apply_document_settings(doc, doc_style)
         
         # Parse Markdown and add content to document
-        self.parser.parse(md_content, doc)
+        self.parser.parse(md_content, doc, base_dir=base_dir)
         
         return doc
     

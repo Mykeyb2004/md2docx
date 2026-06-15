@@ -10,7 +10,11 @@
 # 启动命令
 
 ```bash	
-uv run md2docx-gui
+# 图形界面（可在任意目录运行）
+uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx-gui
+
+# 命令行转换（可在任意目录运行）
+uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx /完整路径/input.md -o /完整路径/output.docx
 ```
 
 
@@ -83,7 +87,7 @@ pip install -e .
 启动图形界面，享受可视化操作体验：
 
 ```bash
-uv run md2docx-gui
+uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx-gui
 ```
 
 **功能特点：**
@@ -109,6 +113,9 @@ uv run md2docx input.md
 
 # 指定输出文件
 uv run md2docx input.md -o output.docx
+
+# 在任意目录运行，并使用完整输入/输出路径
+uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx /完整路径/input.md -o /完整路径/output.docx
 
 # 使用自定义样式配置
 uv run md2docx input.md -s my_styles.yaml
@@ -322,6 +329,7 @@ mermaid:
   width: 5.5in
   alignment: center
   keep_with_previous: true
+  keep_with_previous_max_chars: 80
   force_page_break_before_oversized: false
   space_before: 6pt
   space_after: 6pt
@@ -337,7 +345,9 @@ mermaid:
 - `theme`
   Mermaid 内置主题名，可设为 `default`、`dark`、`forest`、`neutral`、`base`。
 - `keep_with_previous`
-  是否默认把 Mermaid 图片与上一段文字做“同页优先”绑定。默认 `true`，这样后续手工缩小图片时，Word 更容易把“上一段 + 图片”重新排到同一页。
+  是否允许小型 Mermaid 图片与上一段文字做“同页优先”绑定。默认 `true`，但只有命中“小图”规则时才会绑定，避免较大的“正文段 + 图片”整体被 Word 挤到下一页。
+- `keep_with_previous_max_chars`
+  允许绑定上一段的最长文本长度。默认 `80`，用于避免长正文段被图片拖到下一页；设为 `0` 可恢复不限制长度的绑定。
 - `force_page_break_before_oversized`
   超大 Mermaid 图是否强制从新页开始。默认 `false`，避免导出后即使手工缩小图片，仍然被段落级硬分页卡住。
 - `follow_previous_trigger_height_ratio`
