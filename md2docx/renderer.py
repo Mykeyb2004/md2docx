@@ -1,7 +1,8 @@
 """
 Word document renderer module.
 """
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
+from pathlib import Path
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches, Cm, Mm, Emu
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
@@ -9,22 +10,30 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import re
 import mistune
 from io import BytesIO
+from urllib.parse import unquote
 
 
 class DocxRenderer(mistune.BaseRenderer):
     """Custom mistune renderer that outputs to python-docx."""
     
-    def __init__(self, doc: Document, style_manager: Any) -> None:
+    def __init__(
+        self,
+        doc: Document,
+        style_manager: Any,
+        base_dir: Optional[Union[str, Path]] = None,
+    ) -> None:
         """
         Initialize renderer.
         
         Args:
             doc: python-docx Document object
             style_manager: StyleManager instance for style configuration
+            base_dir: Directory used to resolve relative Markdown image paths
         """
         super().__init__()
         self.doc = doc
         self.styles = style_manager
+        self.base_dir = Path(base_dir).resolve() if base_dir else None
         self._current_paragraph = None
         self.math_formulas = {'inline': [], 'block': []}  # Will be set by parser
         self.outline_processing = {'mode': 'auto', 'active': False}
@@ -460,6 +469,14 @@ class DocxRenderer(mistune.BaseRenderer):
             'follow_previous_paragraph': follow_previous,
         }
 
+    def _can_bind_mermaid_to_previous(self, paragraph: Any, mermaid_style: Dict[str, Any]) -> bool:
+        """Return True when the previous text is short enough to bind to a Mermaid image."""
+        max_chars = int(mermaid_style.get('keep_with_previous_max_chars', 80))
+        if max_chars <= 0:
+            return True
+
+        return len(paragraph.text.strip()) <= max_chars
+
     def _add_block_image(
         self,
         img_bytes: bytes,
@@ -514,6 +531,83 @@ class DocxRenderer(mistune.BaseRenderer):
             p.paragraph_format.widow_control = widow_control
 
         return p, shape
+
+    def _resolve_image_path(self, url: str) -> Path:
+        """Resolve an image URL against the Markdown base directory."""
+        image_path = Path(unquote(url))
+        if image_path.is_absolute():
+            return image_path
+        if self.base_dir is not None:
+            return (self.base_dir / image_path).resolve()
+        return image_path.resolve()
+
+    def _embed_local_image(
+        self,
+        image_path: Path,
+        display_path: Optional[str] = None,
+        alignment: str = 'center',
+    ) -> None:
+        """Embed a local image file using the existing block-image helper."""
+        visible_path = display_path or image_path.as_posix()
+        if not image_path.exists():
+            self.doc.add_paragraph(f'[Missing image: {visible_path}]')
+            return
+
+        suffix = image_path.suffix.lower().lstrip('.')
+        supported_formats = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tif', 'tiff'}
+        if suffix and suffix not in supported_formats:
+            self.doc.add_paragraph(f'[Unsupported image format: {visible_path}]')
+            return
+
+        try:
+            img_bytes = image_path.read_bytes()
+            width_px, height_px = self._get_image_pixel_size(img_bytes)
+            available_width = int(self._get_available_page_width())
+            available_height = int(self._get_available_page_height())
+            dpi = 96
+            try:
+                from PIL import Image
+
+                with Image.open(BytesIO(img_bytes)) as image:
+                    dpi_info = image.info.get('dpi')
+                    if dpi_info and dpi_info[0]:
+                        dpi = float(dpi_info[0])
+            except Exception:
+                pass
+
+            width_in = width_px / dpi
+            height_in = height_px / dpi
+            width_emu = int(Inches(width_in))
+            height_emu = int(Inches(height_in))
+
+            scale = min(
+                1.0,
+                available_width / width_emu if width_emu else 1.0,
+                available_height / height_emu if height_emu else 1.0,
+            )
+            if scale < 1.0:
+                width_emu = max(1, int(round(width_emu * scale)))
+                height_emu = max(1, int(round(height_emu * scale)))
+
+            self._add_block_image(
+                img_bytes,
+                width=Emu(width_emu),
+                height=Emu(height_emu),
+                alignment=alignment,
+            )
+        except Exception:
+            self.doc.add_paragraph(f'[Failed to embed image: {visible_path}]')
+
+    def image(self, token: Dict[str, Any], state: Any) -> str:
+        """Render Markdown image tokens as embedded document images."""
+        attrs = token.get('attrs') or {}
+        url = attrs.get('url', '')
+        if not url:
+            return ''
+
+        image_path = self._resolve_image_path(url)
+        self._embed_local_image(image_path, display_path=url)
+        return ''
     
     def _apply_paragraph_style(self, paragraph: Any, style: Dict[str, Any]) -> None:
         """Apply style to paragraph."""
@@ -942,6 +1036,7 @@ class DocxRenderer(mistune.BaseRenderer):
                 previous_paragraph = self._get_previous_text_paragraph()
                 keep_with_previous = previous_paragraph is not None and bool(
                     mermaid_style.get('keep_with_previous', True)
+                    and self._can_bind_mermaid_to_previous(previous_paragraph, mermaid_style)
                 )
                 layout = self._calculate_mermaid_layout(
                     img_bytes,
@@ -949,7 +1044,11 @@ class DocxRenderer(mistune.BaseRenderer):
                     can_follow_previous=keep_with_previous,
                 )
 
-                if keep_with_previous and previous_paragraph is not None:
+                if (
+                    keep_with_previous
+                    and previous_paragraph is not None
+                    and layout.get('follow_previous_paragraph')
+                ):
                     previous_paragraph.paragraph_format.keep_with_next = True
 
                 self._add_block_image(

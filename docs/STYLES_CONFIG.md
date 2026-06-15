@@ -397,6 +397,7 @@ mermaid:
   oversized_strategy: page
   force_page_break_before_oversized: false
   keep_with_previous: true
+  keep_with_previous_max_chars: 80
   follow_previous_trigger_height_ratio: 0.24
   follow_previous_width_ratio: 0.55
   follow_previous_space_before: 0pt
@@ -425,7 +426,8 @@ mermaid:
 | `min_readable_width` | 字符串 | `3.2in` | 如果缩放后宽度低于该值，可触发分页策略 |
 | `oversized_strategy` | 字符串 | `page` | 超大图处理策略，`page` 表示按整页优先的尺寸上限处理 |
 | `force_page_break_before_oversized` | 布尔值 | `false` | 是否对超大图写入硬性的段前分页 |
-| `keep_with_previous` | 布尔值 | `true` | 是否默认把 Mermaid 图片与上一段设置为同页优先 |
+| `keep_with_previous` | 布尔值 | `true` | 是否允许小型 Mermaid 图片与上一段设置为同页优先；仅命中“小图”规则时生效 |
+| `keep_with_previous_max_chars` | 数字 | `80` | 允许绑定上一段的最长文本长度；设为 `0` 表示不限制 |
 | `follow_previous_trigger_height_ratio` | 数字 | `0.24` | “小图”阈值，按图片最终高度占可用页高的比例判断。值越大越宽松 |
 | `follow_previous_width_ratio` | 数字 | `0.55` | 命中“小图”规则后，图片最多占可用页宽的比例 |
 | `follow_previous_space_before` | 字符串 | `0pt` | 小图贴靠上一段时的段前距 |

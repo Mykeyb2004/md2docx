@@ -2,7 +2,8 @@
 Markdown parser module.
 """
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 import mistune
 from docx import Document
 from md2docx.renderer import DocxRenderer
@@ -39,13 +40,19 @@ class MarkdownParser:
             'active': False,
         }
     
-    def parse(self, md_text: str, doc: Document) -> None:
+    def parse(
+        self,
+        md_text: str,
+        doc: Document,
+        base_dir: Optional[Union[str, Path]] = None,
+    ) -> None:
         """
         Parse Markdown text and add content to document.
         
         Args:
             md_text: Markdown text to parse
             doc: python-docx Document object to add content to
+            base_dir: Directory used to resolve relative image paths
         """
         # Preprocess: Convert LaTeX formulas to placeholders
         md_text = self._preprocess_math(md_text)
@@ -53,7 +60,7 @@ class MarkdownParser:
         md_text = self._preprocess_outline(md_text)
         
         # Create renderer with the document and style manager
-        self.renderer = DocxRenderer(doc, self.style_manager)
+        self.renderer = DocxRenderer(doc, self.style_manager, base_dir=base_dir)
         
         # Pass formulas to renderer
         self.renderer.math_formulas = self.math_formulas

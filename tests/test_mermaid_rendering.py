@@ -98,6 +98,44 @@ def test_small_mermaid_block_stays_attached_to_previous_paragraph():
     assert int(shape.width) < int(renderer._parse_length('5.5in', default_unit='in'))
 
 
+def test_small_mermaid_block_does_not_bind_long_body_paragraph():
+    """Compact Mermaid diagrams should not drag a long body paragraph forward."""
+    doc = Document()
+    style_manager = StyleManager()
+    style_manager.config.setdefault('mermaid', {}).update({
+        'width': '5.5in',
+        'page_break_threshold_ratio': 1.0,
+        'follow_previous_trigger_height_ratio': 0.30,
+        'follow_previous_width_ratio': 0.45,
+        'follow_previous_space_before': '0pt',
+        'oversized_strategy': 'shrink',
+    })
+    renderer = DocxRenderer(doc, style_manager)
+
+    class DummyMermaidConverter:
+        def mermaid_to_image(self, code: str) -> bytes:
+            return _sample_png_bytes_with_size(800, 240)
+
+    renderer.mermaid_converter = DummyMermaidConverter()
+
+    doc.add_paragraph(
+        "对未保系统平台预警人员、热线求助对象以及测评中的“红色”风险儿童，"
+        "菲尔德咨询将坚持个案干预与社会救助联动推进。"
+        "对符合条件的家庭，及时协助准备证明材料、对接乡镇民政、村居儿童主任和相关救助窗口。"
+    )
+
+    token = {
+        'type': 'block_code',
+        'raw': 'graph TD\nA-->B\n',
+        'attrs': {'info': 'mermaid'},
+    }
+
+    renderer.block_code(token, _MockState())
+
+    assert len(doc.paragraphs) == 2
+    assert doc.paragraphs[0].paragraph_format.keep_with_next is not True
+
+
 def test_mermaid_block_scales_tall_image_to_fit_page_height():
     """Tall Mermaid diagrams should be reduced to the configured height limit."""
     doc = Document()
@@ -133,7 +171,7 @@ def test_mermaid_block_scales_tall_image_to_fit_page_height():
 
 
 def test_large_mermaid_block_does_not_bind_previous_paragraph():
-    """Large Mermaid diagrams should still stay bound to the previous paragraph."""
+    """Large Mermaid diagrams should not bind the previous paragraph."""
     doc = Document()
     style_manager = StyleManager()
     style_manager.config.setdefault('mermaid', {}).update({
@@ -160,7 +198,7 @@ def test_large_mermaid_block_does_not_bind_previous_paragraph():
     renderer.block_code(token, _MockState())
 
     assert len(doc.paragraphs) == 2
-    assert doc.paragraphs[0].paragraph_format.keep_with_next is True
+    assert doc.paragraphs[0].paragraph_format.keep_with_next is not True
     assert int(doc.paragraphs[1].paragraph_format.space_before) > 0
 
 
@@ -197,7 +235,7 @@ def test_mermaid_block_avoids_hard_page_break_for_oversized_diagram_by_default()
     shape = doc.inline_shapes[0]
     max_height = int(renderer._get_available_page_height()) * 0.9
     assert int(shape.height) <= int(max_height)
-    assert doc.paragraphs[0].paragraph_format.keep_with_next is True
+    assert doc.paragraphs[0].paragraph_format.keep_with_next is not True
     assert doc.paragraphs[1].paragraph_format.page_break_before is False
 
 

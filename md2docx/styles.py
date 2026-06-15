@@ -75,6 +75,7 @@ class StyleManager:
             "oversized_strategy": "page",
             "force_page_break_before_oversized": False,
             "keep_with_previous": True,
+            "keep_with_previous_max_chars": 80,
             "follow_previous_trigger_height_ratio": 0.24,
             "follow_previous_width_ratio": 0.55,
             "follow_previous_space_before": "0pt",
