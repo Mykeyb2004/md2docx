@@ -1,13 +1,25 @@
 """
 Markdown to Word converter.
 """
-from typing import Any, Dict, Optional, Union
+from datetime import datetime, timezone
+import getpass
+import os
 from pathlib import Path
+import re
+import shutil
+import tempfile
+from typing import Any, Dict, Iterable, Optional, Union
+from zipfile import ZIP_DEFLATED, ZipFile
+import xml.etree.ElementTree as ET
+
 from docx import Document
 
 from md2docx.config_utils import merge_config
 from md2docx.styles import StyleManager
 from md2docx.parser import MarkdownParser
+
+
+EXTENDED_PROPERTIES_NS = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
 
 
 class Converter:
@@ -92,6 +104,7 @@ class Converter:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
         doc.save(str(output_path))
+        self._update_extended_properties(output_path, doc)
     
     def to_document(
         self,
@@ -119,8 +132,152 @@ class Converter:
         
         # Parse Markdown and add content to document
         self.parser.parse(md_content, doc, base_dir=base_dir)
+        self._apply_core_properties(doc, md_content)
         
         return doc
+
+    def _apply_core_properties(self, doc: Document, md_content: str) -> None:
+        """
+        Replace python-docx default metadata with document-specific values.
+        """
+        metadata = self.style_manager.get_style("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        author = str(
+            metadata.get("author")
+            or getpass.getuser()
+            or os.environ.get("USER")
+            or os.environ.get("USERNAME")
+            or "md2docx"
+        )
+        now = datetime.now(timezone.utc)
+        props = doc.core_properties
+
+        props.author = author
+        props.last_modified_by = str(metadata.get("last_modified_by") or author)
+        props.title = str(
+            metadata.get("title")
+            or self._extract_title(md_content)
+            or self._first_document_text(doc)
+            or ""
+        )
+        props.subject = str(metadata.get("subject") or "")
+        props.keywords = self._format_keywords(metadata.get("keywords"))
+        props.comments = str(metadata.get("comments") or "")
+        props.category = str(metadata.get("category") or "")
+        props.created = now
+        props.modified = now
+
+    def _extract_title(self, md_content: str) -> str:
+        """Return the first Markdown heading as a document title."""
+        for line in md_content.splitlines():
+            match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", line)
+            if match:
+                return self._clean_metadata_text(match.group(1))
+        return ""
+
+    def _first_document_text(self, doc: Document) -> str:
+        """Return the first non-empty paragraph/table text from a document."""
+        for text in self._iter_document_text(doc):
+            cleaned = text.strip()
+            if cleaned:
+                return self._clean_metadata_text(cleaned)
+        return ""
+
+    def _format_keywords(self, keywords: Any) -> str:
+        """Format keywords from configuration into a metadata string."""
+        if isinstance(keywords, (list, tuple, set)):
+            return ", ".join(str(keyword) for keyword in keywords if str(keyword).strip())
+        return str(keywords or "")
+
+    def _clean_metadata_text(self, text: str) -> str:
+        """Remove lightweight Markdown markers from metadata values."""
+        text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
+        text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+        text = re.sub(r"[*_`~]+", "", text)
+        return text.strip()
+
+    def _update_extended_properties(self, docx_path: Path, doc: Document) -> None:
+        """
+        Refresh docProps/app.xml statistics after python-docx saves the package.
+        """
+        stats = self._collect_document_stats(doc)
+        replacement_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                suffix=".docx",
+                delete=False,
+                dir=str(docx_path.parent),
+            ) as tmp_file:
+                replacement_path = Path(tmp_file.name)
+
+            with ZipFile(docx_path, "r") as source, ZipFile(
+                replacement_path,
+                "w",
+                compression=ZIP_DEFLATED,
+            ) as target:
+                for item in source.infolist():
+                    data = source.read(item.filename)
+                    if item.filename == "docProps/app.xml":
+                        data = self._rewrite_app_properties(data, stats)
+                    target.writestr(item, data)
+
+            shutil.move(str(replacement_path), str(docx_path))
+        finally:
+            if replacement_path is not None and replacement_path.exists():
+                replacement_path.unlink(missing_ok=True)
+
+    def _rewrite_app_properties(self, app_xml: bytes, stats: Dict[str, int]) -> bytes:
+        """Update extended document statistics in app.xml."""
+        ET.register_namespace("", EXTENDED_PROPERTIES_NS)
+        root = ET.fromstring(app_xml)
+
+        self._set_extended_property(root, "Pages", max(1, stats["pages"]))
+        self._set_extended_property(root, "Words", stats["words"])
+        self._set_extended_property(root, "Characters", stats["characters"])
+        self._set_extended_property(root, "CharactersWithSpaces", stats["characters_with_spaces"])
+        self._set_extended_property(root, "Lines", stats["lines"])
+        self._set_extended_property(root, "Paragraphs", stats["paragraphs"])
+        self._set_extended_property(root, "TotalTime", 1)
+        self._set_extended_property(root, "AppVersion", "16.0000")
+
+        return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+    def _set_extended_property(self, root: ET.Element, name: str, value: Any) -> None:
+        """Set one property in docProps/app.xml, creating it if needed."""
+        element = root.find(f"{{{EXTENDED_PROPERTIES_NS}}}{name}")
+        if element is None:
+            element = ET.SubElement(root, f"{{{EXTENDED_PROPERTIES_NS}}}{name}")
+        element.text = str(value)
+
+    def _collect_document_stats(self, doc: Document) -> Dict[str, int]:
+        """Collect conservative document statistics for docProps/app.xml."""
+        text_parts = [text.strip() for text in self._iter_document_text(doc) if text.strip()]
+        full_text = "\n".join(text_parts)
+        characters_with_spaces = len(full_text)
+        characters = len(re.sub(r"\s+", "", full_text))
+        words = len(re.findall(r"[A-Za-z0-9]+|[\u4e00-\u9fff]", full_text))
+        paragraphs = len(text_parts)
+
+        return {
+            "pages": 1,
+            "words": max(1, words) if full_text else 0,
+            "characters": characters,
+            "characters_with_spaces": characters_with_spaces,
+            "lines": max(1, paragraphs) if full_text else 0,
+            "paragraphs": paragraphs,
+        }
+
+    def _iter_document_text(self, doc: Document) -> Iterable[str]:
+        """Yield paragraph and table cell text from a python-docx document."""
+        for paragraph in doc.paragraphs:
+            yield paragraph.text
+
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    yield cell.text
     
     def _apply_document_settings(self, doc: Document, style: dict) -> None:
         """

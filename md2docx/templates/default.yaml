@@ -11,6 +11,17 @@ document:
   ignore_thematic_breaks: true  # true = 忽略 Markdown 分割线，不写入 docx
   auto_fix_tables: false  # true = 自动修复缺少 separator 的不规范 Markdown 表格
 
+# Word document metadata.
+# Fill these for upload-sensitive documents to avoid blank or tool-default properties.
+metadata:
+  author: null
+  last_modified_by: null
+  title: null
+  subject: null
+  keywords: []
+  comments: null
+  category: null
+
 # Heading styles (levels 1-4)
 heading1:
   font_name: "方正小标宋简体"
