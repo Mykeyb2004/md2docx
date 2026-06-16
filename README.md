@@ -213,6 +213,11 @@ document:
   margin_bottom: 2.54cm
   margin_left: 3.17cm
   margin_right: 3.17cm
+metadata:
+  author: "张三"        # 建议填写真实作者
+  title: "项目报告"      # 可选；默认取首个 Markdown 标题
+  subject: "技术文档"
+  keywords: ["md2docx", "报告"]
 
 # 2. 标题样式 (heading1-4)
 heading1:
@@ -278,6 +283,10 @@ chapter_scan:
 
 - **默认配置**: `md2docx/templates/default.yaml`
 - **自定义配置**: 任意路径的 `.yaml` 文件
+
+### 文档元数据
+
+为了减少上传平台把文件误判成“第三方采集软件生成”的概率，建议显式填写 `metadata` 段中的作者、标题、主题和关键词。若不填写，程序会尽量从 Markdown 内容和当前系统用户中推导合理值，并写入 Word 的核心属性。
 
 ### 章节排版异常扫描
 
