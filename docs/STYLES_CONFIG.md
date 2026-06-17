@@ -685,7 +685,7 @@ uv run md2docx input.md
 uv run md2docx input.md -s custom_styles.yaml
 
 # 指定输出文件
-uv run md2docx input.md -o output.docx -s my_styles.yaml
+uv run md2docx input.md --output-file output.docx -s my_styles.yaml
 ```
 
 ### 方法2：Python API

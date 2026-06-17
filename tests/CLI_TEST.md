@@ -16,29 +16,52 @@ ls -lh test.docx
 
 ### 2. 指定输出文件
 ```bash
-uv run md2docx test.md -o my_output.docx
+uv run md2docx test.md --output-file my_output.docx
 ```
 
-### 3. 使用模板
+### 3. 指定输出目录
 ```bash
-uv run md2docx test.md -t default -o output_with_template.docx
+uv run md2docx test.md --output-dir converted
+
+# 检查文件是否生成
+ls -lh converted/test.docx
 ```
 
-### 4. 查看帮助
+### 4. 递归转换目录
+```bash
+mkdir -p docs/a docs/b
+echo "# A" > docs/a/report.md
+echo "# B" > docs/b/report.md
+
+uv run md2docx docs --output-dir converted
+
+# 平铺输出，使用相对路径前缀避免同名覆盖
+ls -lh converted/a_report.docx converted/b_report.docx
+```
+
+### 5. 使用模板
+```bash
+uv run md2docx test.md -t default --output-file output_with_template.docx
+```
+
+### 6. 查看帮助
 ```bash
 uv run md2docx --help
 ```
 
-### 5. 查看版本
+### 7. 查看版本
 ```bash
 uv run md2docx --version
 ```
 
-### 6. 错误处理测试
+### 8. 错误处理测试
 ```bash
 # 文件不存在
 uv run md2docx nonexistent.md
 
 # 同时使用模板和配置文件（应该报错）
 uv run md2docx test.md -t default -s custom.yaml
+
+# 同时指定输出文件和输出目录（应该报错）
+uv run md2docx test.md --output-file custom.docx --output-dir converted
 ```

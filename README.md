@@ -14,7 +14,7 @@
 uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx-gui
 
 # 命令行转换（可在任意目录运行）
-uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx /完整路径/input.md -o /完整路径/output.docx
+uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx /完整路径/input.md --output-file /完整路径/output.docx
 ```
 
 
@@ -112,10 +112,16 @@ uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx-gui
 uv run md2docx input.md
 
 # 指定输出文件
-uv run md2docx input.md -o output.docx
+uv run md2docx input.md --output-file output.docx
+
+# 指定输出目录，文件名保持为 input.docx
+uv run md2docx input.md --output-dir output
+
+# 递归转换整个目录下的所有 Markdown 文件，并统一输出到一个目录
+uv run md2docx docs --output-dir output
 
 # 在任意目录运行，并使用完整输入/输出路径
-uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx /完整路径/input.md -o /完整路径/output.docx
+uv run --project /Users/zhangqijin/PycharmProjects/md2docx md2docx /完整路径/input.md --output-file /完整路径/output.docx
 
 # 使用自定义样式配置
 uv run md2docx input.md -s my_styles.yaml
