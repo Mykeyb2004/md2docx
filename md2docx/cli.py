@@ -4,7 +4,22 @@ Command-line interface for md2docx.
 import argparse
 import sys
 from pathlib import Path
+
 from md2docx import Converter
+
+
+def _iter_markdown_files(root: Path) -> list[Path]:
+    """Return Markdown files under a directory in deterministic order."""
+    return sorted(
+        (path for path in root.rglob("*.md") if path.is_file()),
+        key=lambda path: path.relative_to(root).as_posix(),
+    )
+
+
+def _flatten_output_name(md_file: Path, root: Path) -> str:
+    """Flatten a Markdown path under root into a unique DOCX filename."""
+    relative_path = md_file.relative_to(root).with_suffix("")
+    return f"{'_'.join(relative_path.parts)}.docx"
 
 
 def main() -> None:
@@ -14,7 +29,9 @@ def main() -> None:
         description='Convert Markdown files to Word documents with precise style control',
         epilog='Examples:\n'
                '  md2docx input.md                    # Convert to input.docx\n'
-               '  md2docx input.md -o output.docx     # Specify output file\n'
+               '  md2docx input.md --output-file output.docx  # Specify output file\n'
+               '  md2docx input.md --output-dir out   # Save into a directory\n'
+               '  md2docx docs --output-dir out       # Recursively convert all .md files\n'
                '  md2docx input.md -t chinese_academic  # Use template\n'
                '  md2docx input.md -s custom.yaml     # Use custom styles',
         formatter_class=argparse.RawDescriptionHelpFormatter
@@ -27,10 +44,26 @@ def main() -> None:
     )
     
     parser.add_argument(
-        '-o', '--output',
+        '-o', '--output-file',
+        dest='output',
         type=str,
         default=None,
+        metavar='FILE',
         help='Output Word document path (default: same as input with .docx extension)'
+    )
+    parser.add_argument(
+        '--output',
+        dest='output',
+        type=str,
+        help=argparse.SUPPRESS
+    )
+
+    parser.add_argument(
+        '--output-dir',
+        type=str,
+        default=None,
+        metavar='DIR',
+        help='Directory to save converted Word documents (required when input is a directory)'
     )
     
     parser.add_argument(
@@ -41,7 +74,8 @@ def main() -> None:
     )
     
     parser.add_argument(
-        '-s', '--style-config',
+        '-s', '--style-file', '--style-config',
+        dest='style_config',
         type=str,
         default=None,
         metavar='FILE',
@@ -63,15 +97,22 @@ def main() -> None:
         sys.exit(1)
     
     # Determine output path
-    if args.output:
+    if args.output and args.output_dir:
+        parser.error("choose one: --output-file FILE or --output-dir DIR")
+
+    if input_path.is_dir():
+        if not args.output_dir:
+            parser.error("directory input requires --output-dir DIR")
+    elif args.output_dir:
+        output_path = Path(args.output_dir) / input_path.with_suffix('.docx').name
+    elif args.output:
         output_path = args.output
     else:
         output_path = input_path.with_suffix('.docx')
     
     # Check for conflicts
     if args.template and args.style_config:
-        print("Error: Cannot use both --template and --style-config", file=sys.stderr)
-        sys.exit(1)
+        parser.error("choose one: --template NAME or --style-file FILE")
     
     try:
         # Create converter
@@ -79,11 +120,25 @@ def main() -> None:
             template=args.template,
             style_config=args.style_config
         )
-        
-        # Convert
-        print(f"Converting {args.input} to {output_path}...")
-        converter.convert(args.input, str(output_path))
-        print(f"✓ Conversion successful! Output: {output_path}")
+
+        if input_path.is_dir():
+            markdown_files = _iter_markdown_files(input_path)
+            if not markdown_files:
+                print(f"Error: No Markdown files found under {args.input}", file=sys.stderr)
+                sys.exit(1)
+
+            output_dir = Path(args.output_dir)
+            for md_file in markdown_files:
+                output_path = output_dir / _flatten_output_name(md_file, input_path)
+                print(f"Converting {md_file} to {output_path}...")
+                converter.convert(str(md_file), str(output_path))
+
+            print(f"✓ Conversion successful! Converted {len(markdown_files)} file(s). Output dir: {output_dir}")
+        else:
+            # Convert
+            print(f"Converting {args.input} to {output_path}...")
+            converter.convert(args.input, str(output_path))
+            print(f"✓ Conversion successful! Output: {output_path}")
         
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -97,4 +152,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

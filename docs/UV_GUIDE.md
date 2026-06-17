@@ -54,7 +54,7 @@ uv sync
 ### 运行 Python 脚本
 ```bash
 # 运行转换工具
-uv run md2docx input.md -o output.docx
+uv run md2docx input.md --output-file output.docx
 
 # 运行示例代码
 uv run python examples/basic_usage.py
@@ -210,7 +210,7 @@ uv run flake8 md2docx/
 ### 3. 测试转换功能
 ```bash
 # 测试命令行工具
-uv run md2docx 研究报告\ v01.md -o 测试报告.docx -v
+uv run md2docx 研究报告\ v01.md --output-file 测试报告.docx
 
 # 测试 Python API
 uv run python -c "
