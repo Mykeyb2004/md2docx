@@ -1,12 +1,14 @@
 """
 Word document renderer module.
 """
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from pathlib import Path
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches, Cm, Mm, Emu
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 import re
 import mistune
 from io import BytesIO
@@ -40,7 +42,9 @@ class DocxRenderer(mistune.BaseRenderer):
         
         # Initialize math converter for LaTeX formulas
         from md2docx.math_converter import MathConverter
+        from md2docx.omml_converter import OmmlConverter
         self.math_converter = MathConverter(dpi=300)
+        self.omml_converter = OmmlConverter()
 
         # Initialize Mermaid converter for fenced mermaid blocks
         from md2docx.mermaid_converter import MermaidConverter
@@ -170,6 +174,164 @@ class DocxRenderer(mistune.BaseRenderer):
         """Get the usable document width after subtracting page margins."""
         section = self.doc.sections[-1]
         return section.page_width - section.left_margin - section.right_margin
+
+    def _weighted_text_length(self, text: str) -> float:
+        """Estimate text width, counting CJK characters as wider than ASCII."""
+        weight = 0.0
+        for char in text:
+            if char.isspace():
+                weight += 0.25
+            elif '\u4e00' <= char <= '\u9fff':
+                weight += 1.8
+            elif ord(char) > 127:
+                weight += 1.4
+            else:
+                weight += 1.0
+        return weight
+
+    def _plain_token_text(self, token: Dict[str, Any]) -> str:
+        """Extract readable text from a mistune token tree without rendering."""
+        if 'raw' in token:
+            return str(token['raw'])
+
+        if 'text' in token:
+            return str(token['text'])
+
+        children = token.get('children', [])
+        if isinstance(children, list):
+            return ''.join(self._plain_token_text(child) for child in children)
+
+        return ''
+
+    def _collect_table_column_weights(
+        self,
+        table_head: Optional[Dict[str, Any]],
+        table_body: Optional[Dict[str, Any]],
+        col_count: int,
+    ) -> List[float]:
+        """Estimate content weight for each table column."""
+        weights = [1.0 for _ in range(col_count)]
+
+        rows = []
+        if table_head:
+            rows.append(table_head)
+        if table_body:
+            rows.extend(table_body.get('children', []))
+
+        for row_token in rows:
+            cells = row_token.get('children', [])
+            for col_idx, cell_token in enumerate(cells[:col_count]):
+                text = self._plain_token_text(cell_token).strip()
+                weights[col_idx] = max(weights[col_idx], self._weighted_text_length(text))
+
+        return weights
+
+    def _normalize_width_ratios(self, ratios: List[float], minimum: float, maximum: float) -> List[float]:
+        """Clamp and normalize width ratios until they sum to 1.0."""
+        if not ratios:
+            return []
+
+        clamped = [min(max(ratio, minimum), maximum) for ratio in ratios]
+        total = sum(clamped)
+        if total <= 0:
+            return [1 / len(ratios) for _ in ratios]
+
+        normalized = [ratio / total for ratio in clamped]
+        for _ in range(4):
+            adjusted = [min(max(ratio, minimum), maximum) for ratio in normalized]
+            total = sum(adjusted)
+            normalized = [ratio / total for ratio in adjusted]
+
+        return normalized
+
+    def _calculate_table_column_widths(
+        self,
+        table_head: Optional[Dict[str, Any]],
+        table_body: Optional[Dict[str, Any]],
+        col_count: int,
+        table_style: Dict[str, Any],
+    ) -> List[int]:
+        """Calculate table column widths in EMUs."""
+        if col_count <= 0:
+            return []
+
+        available_width = int(self._get_available_page_width())
+        equal_ratio = 1 / col_count
+        strategy = str(table_style.get('column_width_strategy', 'content-weighted')).lower()
+        weights = self._collect_table_column_weights(table_head, table_body, col_count)
+        weight_total = sum(weights)
+
+        if weight_total <= 0:
+            ratios = [equal_ratio for _ in range(col_count)]
+        else:
+            ratios = [weight / weight_total for weight in weights]
+
+        if strategy == 'balanced':
+            ratios = [(ratio * 0.45) + (equal_ratio * 0.55) for ratio in ratios]
+            ratios = self._normalize_width_ratios(
+                ratios,
+                minimum=max(0.12, equal_ratio * 0.72),
+                maximum=min(0.48, equal_ratio * 1.45),
+            )
+        else:
+            ratios = self._normalize_width_ratios(
+                ratios,
+                minimum=max(0.08, equal_ratio * 0.38),
+                maximum=min(0.62, equal_ratio * 2.15),
+            )
+
+        widths = [max(1, int(round(available_width * ratio))) for ratio in ratios]
+        width_delta = available_width - sum(widths)
+        if widths:
+            widths[-1] += width_delta
+
+        return widths
+
+    def _set_table_column_widths(self, table: Any, widths: List[int]) -> None:
+        """Apply fixed table and column widths to a python-docx table."""
+        if not widths:
+            return
+
+        table.autofit = False
+        table.allow_autofit = False
+
+        tbl_pr = table._tbl.tblPr
+        tbl_layout = tbl_pr.first_child_found_in('w:tblLayout')
+        if tbl_layout is None:
+            tbl_layout = OxmlElement('w:tblLayout')
+            tbl_pr.append(tbl_layout)
+        tbl_layout.set(qn('w:type'), 'fixed')
+
+        table_width = sum(widths)
+        tbl_w = tbl_pr.first_child_found_in('w:tblW')
+        if tbl_w is None:
+            tbl_w = OxmlElement('w:tblW')
+            tbl_pr.append(tbl_w)
+        tbl_w.set(qn('w:type'), 'dxa')
+        tbl_w.set(qn('w:w'), str(int(round(table_width / 635))))
+
+        grid = table._tbl.tblGrid
+        for col_idx, width in enumerate(widths):
+            if col_idx < len(grid.gridCol_lst):
+                grid_col = grid.gridCol_lst[col_idx]
+            else:
+                grid_col = OxmlElement('w:gridCol')
+                grid.append(grid_col)
+            grid_col.set(qn('w:w'), str(int(round(width / 635))))
+
+        for row in table.rows:
+            for col_idx, cell in enumerate(row.cells):
+                if col_idx >= len(widths):
+                    continue
+
+                cell.width = Emu(widths[col_idx])
+                tc_pr = cell._tc.get_or_add_tcPr()
+                tc_w = tc_pr.tcW
+                if tc_w is None:
+                    tc_w = OxmlElement('w:tcW')
+                    tc_pr.append(tc_w)
+                tc_w.set(qn('w:type'), 'dxa')
+                tc_w.set(qn('w:w'), str(int(round(widths[col_idx] / 635))))
 
     def _get_available_page_height(self):
         """Get the usable document height after subtracting page margins."""
@@ -753,25 +915,9 @@ class DocxRenderer(mistune.BaseRenderer):
                 idx = int(idx_str)
                 if idx < len(self.math_formulas.get('block', [])):
                     latex = self.math_formulas['block'][idx]
-                    try:
-                        img_bytes = self.math_converter.latex_to_image(latex, inline=False)
-                        
-                        # Create a centered paragraph for the formula
-                        p = self.doc.add_paragraph()
-                        p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-                        
-                        # Add image
-                        run = p.add_run()
-                        run.add_picture(BytesIO(img_bytes), width=Inches(4))
-                        
-                        # Apply spacing
-                        p.paragraph_format.space_before = Pt(6)
-                        p.paragraph_format.space_after = Pt(6)
-                        
+                    if self._add_block_math_formula(latex):
                         return ''
-                    except Exception as e:
-                        # Fallback: show LaTeX code
-                        text = f'$$\\n{latex}\\n$$'
+                    text = f'$$\\n{latex}\\n$$'
             except:
                 pass
         
@@ -796,6 +942,71 @@ class DocxRenderer(mistune.BaseRenderer):
         self._apply_text_paragraph_format(p, style)
         
         return ''
+
+    def _append_omml(self, paragraph: Any, latex: str, inline: bool) -> bool:
+        """Append Word-native OMML math to a paragraph when conversion succeeds."""
+        try:
+            elements = self.omml_converter.latex_to_omml(latex, inline=inline)
+        except Exception:
+            return False
+
+        if not elements:
+            return False
+
+        for element in elements:
+            paragraph._p.append(element)
+        return True
+
+    def _apply_math_block_format(self, paragraph: Any) -> None:
+        """Apply configured block math paragraph formatting."""
+        math_style = self.styles.get_style('math_block', {})
+        alignment = str(math_style.get('alignment', 'center')).lower()
+        if alignment == 'left':
+            paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+        elif alignment == 'right':
+            paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+        else:
+            paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+
+        if 'space_before' in math_style:
+            paragraph.paragraph_format.space_before = Pt(
+                self._parse_font_size(math_style['space_before'])
+            )
+        else:
+            paragraph.paragraph_format.space_before = Pt(6)
+
+        if 'space_after' in math_style:
+            paragraph.paragraph_format.space_after = Pt(
+                self._parse_font_size(math_style['space_after'])
+            )
+        else:
+            paragraph.paragraph_format.space_after = Pt(6)
+
+    def _add_block_math_formula(self, latex: str) -> bool:
+        """Add a display formula as OMML, falling back to the existing PNG path."""
+        latex = latex.strip()
+        if not latex:
+            return False
+
+        paragraph = self.doc.add_paragraph()
+        self._apply_math_block_format(paragraph)
+        if self._append_omml(paragraph, latex, inline=False):
+            return True
+
+        try:
+            img_bytes = self.math_converter.latex_to_image(latex, inline=False)
+            run = paragraph.add_run()
+            math_style = self.styles.get_style('math_block', {})
+            width_value = math_style.get('width')
+            if width_value:
+                width = self._parse_length(width_value)
+                run.add_picture(BytesIO(img_bytes), width=width)
+            else:
+                run.add_picture(BytesIO(img_bytes), width=Inches(4))
+            return True
+        except Exception:
+            paragraph._element.getparent().remove(paragraph._element)
+            return False
     
     def _add_formatted_text(self, paragraph: Any, text: str, base_style: Dict[str, Any]) -> None:
         """
@@ -818,7 +1029,7 @@ class DocxRenderer(mistune.BaseRenderer):
         text = text.replace('</code>', '**END_CODE**')
         
         # Split by markers and process (including math placeholders with Unicode brackets)
-        parts = re.split(r'(\*\*START_BOLD\*\*|\*\*END_BOLD\*\*|\*\*START_ITALIC\*\*|\*\*END_ITALIC\*\*|\*\*START_CODE\*\*|\*\*END_CODE\*\*|〔INLINE_MATH_\d+〕|〔BLOCK_MATH_\d+〕)', text)
+        parts = re.split(r'(\*\*START_BOLD\*\*|\*\*END_BOLD\*\*|\*\*START_ITALIC\*\*|\*\*END_ITALIC\*\*|\*\*START_CODE\*\*|\*\*END_CODE\*\*|〔INLINE_MATH_\d+〕|〔INLINE_MATH_DIRECT:.*?〕|〔BLOCK_MATH_\d+〕)', text)
         
         bold = False
         italic = False
@@ -850,15 +1061,25 @@ class DocxRenderer(mistune.BaseRenderer):
                     formulas = getattr(self, 'math_formulas', {'inline': []})
                     if idx < len(formulas.get('inline', [])):
                         latex = formulas['inline'][idx]
-                        try:
-                            img_bytes = self.math_converter.latex_to_image(latex, inline=True)
-                            run = paragraph.add_run()
-                            run.add_picture(BytesIO(img_bytes), height=Inches(0.15))
-                        except:
-                            # Fallback: show LaTeX code
-                            paragraph.add_run(f'${latex}$')
+                        if not self._append_omml(paragraph, latex, inline=True):
+                            try:
+                                img_bytes = self.math_converter.latex_to_image(latex, inline=True)
+                                run = paragraph.add_run()
+                                run.add_picture(BytesIO(img_bytes), height=Inches(0.15))
+                            except:
+                                # Fallback: show LaTeX code
+                                paragraph.add_run(f'${latex}$')
                 except:
                     pass
+            elif part.startswith('〔INLINE_MATH_DIRECT:') and part.endswith('〕'):
+                latex = part.replace('〔INLINE_MATH_DIRECT:', '').replace('〕', '')
+                if not self._append_omml(paragraph, latex, inline=True):
+                    try:
+                        img_bytes = self.math_converter.latex_to_image(latex, inline=True)
+                        run = paragraph.add_run()
+                        run.add_picture(BytesIO(img_bytes), height=Inches(0.15))
+                    except:
+                        paragraph.add_run(f'${latex}$')
             elif part.startswith('〔BLOCK_MATH_') and part.endswith('〕'):
                 # Block math should not appear in inline text
                 # This shouldn't happen with proper preprocessing
@@ -955,18 +1176,8 @@ class DocxRenderer(mistune.BaseRenderer):
         latex = token.get('raw', '')
         if not latex:
             return ''
-        
-        try:
-            # Render formula to image
-            img_bytes = self.math_converter.latex_to_image(latex, inline=True)
-            
-            # Create a marker that will be replaced in paragraph processing
-            # For now, add image to current paragraph immediately
-            # Note: This is a simplified approach for inline formulas
-            return f'**INLINE_MATH:{latex}**'
-        except Exception as e:
-            # If rendering fails, show the LaTeX code
-            return f'${latex}$'
+
+        return f'〔INLINE_MATH_DIRECT:{latex}〕'
     
     def block_math(self, token: Dict[str, Any], state: Any) -> str:
         """
@@ -982,32 +1193,11 @@ class DocxRenderer(mistune.BaseRenderer):
         latex = token.get('raw', '')
         if not latex:
             return ''
-        
-        try:
-            # Render formula to image
-            img_bytes = self.math_converter.latex_to_image(latex, inline=False)
-            
-            # Create a centered paragraph for the formula
-            p = self.doc.add_paragraph()
-            p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-            
-            # Add image to paragraph
-            run = p.add_run()
-            run.add_picture(BytesIO(img_bytes), width=Inches(4))
-            
-            # Apply spacing from math_block style if available
-            math_style = self.styles.get_style('math_block', {})
-            if 'space_before' in math_style:
-                p.paragraph_format.space_before = Pt(self._parse_font_size(math_style['space_before']))
-            if 'space_after' in math_style:
-                p.paragraph_format.space_after = Pt(self._parse_font_size(math_style['space_after']))
-            
-            return ''
-        except Exception as e:
-            # If rendering fails, show the LaTeX code in a code block
+
+        if not self._add_block_math_formula(latex):
             p = self.doc.add_paragraph(f'$$\n{latex}\n$$')
             p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-            return ''
+        return ''
     
     def block_code(self, token: Dict[str, Any], state: Any) -> str:
         """
@@ -1027,6 +1217,12 @@ class DocxRenderer(mistune.BaseRenderer):
         language = language_info.split(None, 1)[0].lower() if language_info else ''
         
         if not code_text:
+            return ''
+
+        if language in {'latex', 'tex'}:
+            if not self._add_block_math_formula(code_text):
+                p = self.doc.add_paragraph(f'$$\n{code_text.strip()}\n$$')
+                p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             return ''
 
         if language == 'mermaid':
@@ -1474,6 +1670,13 @@ class DocxRenderer(mistune.BaseRenderer):
         
         # Create table
         table = self.doc.add_table(rows=row_count, cols=col_count)
+        column_widths = self._calculate_table_column_widths(
+            table_head,
+            table_body,
+            col_count,
+            table_style,
+        )
+        self._set_table_column_widths(table, column_widths)
         
         # Apply table style if specified
         if 'style' in table_style and table_style['style']:

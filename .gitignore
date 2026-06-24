@@ -65,3 +65,4 @@ ENV/
 # 历史记录
 .md2docx/
 .poc_output/
+.superpowers/

@@ -114,6 +114,9 @@ uv run md2docx input.md
 # 指定输出文件
 uv run md2docx input.md --output-file output.docx
 
+# 覆盖已存在的输出文件
+uv run md2docx input.md --output-file output.docx --overwrite
+
 # 指定输出目录，文件名保持为 input.docx
 uv run md2docx input.md --output-dir output
 

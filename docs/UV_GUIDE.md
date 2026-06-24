@@ -56,6 +56,9 @@ uv sync
 # 运行转换工具
 uv run md2docx input.md --output-file output.docx
 
+# 覆盖已存在的输出文件
+uv run md2docx input.md --output-file output.docx --overwrite
+
 # 运行示例代码
 uv run python examples/basic_usage.py
 ```

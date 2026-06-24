@@ -294,6 +294,7 @@ table:
   header_background: "#F2F2F2"   # 表头背景色
   header_alignment: center       # 表头水平对齐
   header_vertical_alignment: center  # 表头垂直对齐
+  column_width_strategy: content-weighted  # 列宽策略：content-weighted 或 balanced
   border_color: "#CCCCCC"        # 边框颜色
   alignment: left                # 默认对齐（可被Markdown对齐语法覆盖）
   
@@ -315,6 +316,7 @@ table:
 | `header_background` | 字符串 | `"#F2F2F2"` | 十六进制颜色 | 表头背景色 |
 | `header_alignment` | 字符串 | `center` | `left`, `center`, `right`, `inherit` | 表头水平对齐 |
 | `header_vertical_alignment` | 字符串 | `center` | `top`, `center`, `bottom` | 表头垂直对齐 |
+| `column_width_strategy` | 字符串 | `content-weighted` | `content-weighted`, `balanced` | 列宽策略：默认按内容分配，可切换为更均衡的保守分配 |
 | `border_color` | 字符串 | `"#CCCCCC"` | 十六进制颜色 | 边框颜色 |
 | `alignment` | 字符串 | `left` | `left`, `center`, `right` | 默认对齐 |
 | `alternating_rows` | 布尔值 | `false` | `true`/`false` | 启用斑马纹 |
@@ -331,6 +333,10 @@ md2docx 完全支持 Markdown 表格对齐语法：
 | `\| :--: \|` | 居中 |
 | `\| ---: \|` | 右对齐 |
 | `\| --- \|` | 默认对齐 |
+
+**列宽策略说明**：
+- `content-weighted` - 默认策略。根据每列内容长度分配宽度，短列更窄，长文本列更宽。
+- `balanced` - 均衡策略。仍参考内容长度，但更接近等宽，适合希望表格整体更规整的文档。
 
 **Word 内置表格样式**：
 - `"Light Grid Accent 1"` - 浅色网格（推荐）
@@ -686,6 +692,9 @@ uv run md2docx input.md -s custom_styles.yaml
 
 # 指定输出文件
 uv run md2docx input.md --output-file output.docx -s my_styles.yaml
+
+# 覆盖已存在的输出文件
+uv run md2docx input.md --output-file output.docx -s my_styles.yaml --overwrite
 ```
 
 ### 方法2：Python API

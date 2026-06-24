@@ -116,6 +116,7 @@ table:
   header_background: "#F2F2F2"
   header_alignment: center
   header_vertical_alignment: center
+  column_width_strategy: content-weighted  # content-weighted=按内容自动分配；balanced=更均衡保守
   border_color: "#CCCCCC"
   alignment: left
   # 斑马纹/交替行颜色（可选）
