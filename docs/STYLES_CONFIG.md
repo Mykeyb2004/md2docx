@@ -293,6 +293,9 @@ table:
   header_bold: true              # 表头加粗
   header_background: "#F2F2F2"   # 表头背景色
   header_alignment: center       # 表头水平对齐
+  vertical_alignment: center     # 表体垂直对齐
+  cell_margin_vertical: 3pt      # 单元格上下内边距
+  cell_margin_horizontal: 5.4pt  # 单元格左右内边距
   header_vertical_alignment: center  # 表头垂直对齐
   column_width_strategy: content-weighted  # 列宽策略：content-weighted 或 balanced
   border_color: "#CCCCCC"        # 边框颜色
@@ -315,6 +318,9 @@ table:
 | `header_bold` | 布尔值 | `true` | `true`/`false` | 表头是否加粗 |
 | `header_background` | 字符串 | `"#F2F2F2"` | 十六进制颜色 | 表头背景色 |
 | `header_alignment` | 字符串 | `center` | `left`, `center`, `right`, `inherit` | 表头水平对齐 |
+| `vertical_alignment` | 字符串 | `center` | `top`, `center`, `bottom` | 表体垂直对齐 |
+| `cell_margin_vertical` | 字符串 | `3pt` | 任意尺寸 + `pt` | 单元格上下内边距 |
+| `cell_margin_horizontal` | 字符串 | `5.4pt` | 任意尺寸 + `pt` | 单元格左右内边距 |
 | `header_vertical_alignment` | 字符串 | `center` | `top`, `center`, `bottom` | 表头垂直对齐 |
 | `column_width_strategy` | 字符串 | `content-weighted` | `content-weighted`, `balanced` | 列宽策略：默认按内容分配，可切换为更均衡的保守分配 |
 | `border_color` | 字符串 | `"#CCCCCC"` | 十六进制颜色 | 边框颜色 |
