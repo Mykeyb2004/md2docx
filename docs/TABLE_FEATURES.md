@@ -57,6 +57,18 @@ table:
 
 ---
 
+### 4. 内容感知列宽 ✨ **NEW**
+
+默认按内容长度分配 Word 表格列宽，让短列少占空间、长文本列获得更多空间。可在 YAML 中切换为更均衡的 `balanced` 策略。
+
+**配置：**
+```yaml
+table:
+  column_width_strategy: balanced
+```
+
+---
+
 ## 📋 配置参数完整列表
 
 ### default.yaml 表格配置
@@ -70,6 +82,7 @@ table:
   header_background: "#F2F2F2"   # 表头背景色
   header_alignment: center       # 表头水平居中
   header_vertical_alignment: center  # 表头垂直居中
+  column_width_strategy: content-weighted  # 列宽策略：content-weighted 或 balanced
   border_color: "#CCCCCC"        # 边框颜色
   alignment: left                # 默认对齐方式
   
@@ -111,6 +124,7 @@ table:
 | 文本格式 | ✅ | ✅ |
 | **单元格对齐** | ❌ | ✅ ✨ |
 | **斑马纹** | ❌ | ✅ ✨ |
+| **内容感知列宽** | ❌ | ✅ ✨ |
 
 ---
 

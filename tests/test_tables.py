@@ -8,6 +8,20 @@ from md2docx import Converter
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.oxml.ns import qn
+
+
+def _table_grid_widths(table):
+    """Return table grid column widths in twips."""
+    grid_cols = table._tbl.tblGrid.gridCol_lst
+    widths = [col.get(qn("w:w")) for col in grid_cols]
+    assert all(width is not None for width in widths)
+    return [int(width) for width in widths]
+
+
+def _width_spread(widths):
+    """Return the absolute spread between the widest and narrowest columns."""
+    return max(widths) - min(widths)
 
 
 def test_simple_table():
@@ -67,6 +81,67 @@ def test_table_with_chinese():
         assert "姓名" in table.rows[0].cells[0].text
     finally:
         Path(output_path).unlink(missing_ok=True)
+
+
+def test_default_table_column_widths_are_content_weighted():
+    """Default table widths should give longer text columns more room."""
+    converter = Converter()
+
+    md_content = """
+| 阶段 | 核心任务 | 成果 |
+|------|----------|------|
+| 采集 | 跨源提取、字段标准化、重复记录识别与基础数据质量校验 | 数据集 |
+| 审核 | 表内表间逻辑比对、异常规则核查、疑似问题回溯定位 | 报告 |
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter.convert_string(md_content, output_path)
+        doc = Document(output_path)
+        widths = _table_grid_widths(doc.tables[0])
+
+        assert len(widths) == 3
+        assert widths[1] > widths[0]
+        assert widths[1] > widths[2]
+        assert len(set(widths)) > 1
+    finally:
+        Path(output_path).unlink(missing_ok=True)
+
+
+def test_balanced_table_column_widths_are_more_even_than_default():
+    """Balanced strategy should reduce the width spread for the same table."""
+    md_content = """
+| 阶段 | 核心任务 | 成果 |
+|------|----------|------|
+| 采集 | 跨源提取、字段标准化、重复记录识别与基础数据质量校验 | 数据集 |
+| 审核 | 表内表间逻辑比对、异常规则核查、疑似问题回溯定位 | 报告 |
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as default_file:
+        default_output_path = default_file.name
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as balanced_file:
+        balanced_output_path = balanced_file.name
+
+    try:
+        Converter().convert_string(md_content, default_output_path)
+        Converter(
+            config_override={"table": {"column_width_strategy": "balanced"}}
+        ).convert_string(md_content, balanced_output_path)
+
+        default_doc = Document(default_output_path)
+        balanced_doc = Document(balanced_output_path)
+        default_widths = _table_grid_widths(default_doc.tables[0])
+        balanced_widths = _table_grid_widths(balanced_doc.tables[0])
+
+        assert len(balanced_widths) == 3
+        assert balanced_widths[1] > balanced_widths[0]
+        assert balanced_widths[1] > balanced_widths[2]
+        assert _width_spread(balanced_widths) < _width_spread(default_widths)
+    finally:
+        Path(default_output_path).unlink(missing_ok=True)
+        Path(balanced_output_path).unlink(missing_ok=True)
 
 
 def test_mixed_content_with_table():

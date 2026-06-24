@@ -39,8 +39,8 @@ heading2:
   bold: true
   space_before: 6pt
   space_after: 6pt
-  alignment: left
-  first_line_indent: 2
+  alignment: center
+  first_line_indent: 0
 
 heading3:
   font_name: "楷体"
@@ -116,7 +116,6 @@ table:
   header_background: "#F2F2F2"
   header_alignment: center
   header_vertical_alignment: center
-  column_width_strategy: content-weighted  # content-weighted=按内容自动分配；balanced=更均衡保守
   border_color: "#CCCCCC"
   alignment: left
   # 斑马纹/交替行颜色（可选）
@@ -141,7 +140,7 @@ math_inline:
   dpi: 300        # 渲染分辨率
 
 math_block:
-  width: 4in      # 块级公式图片宽度 
+  width: 4in      # 块级公式图片宽度
   alignment: center
   space_before: 6pt
   space_after: 6pt

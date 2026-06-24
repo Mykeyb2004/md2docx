@@ -3,8 +3,16 @@ Tests for LaTeX math formula rendering.
 """
 import pytest
 from pathlib import Path
+import zipfile
 from md2docx import Converter
 from md2docx.math_converter import MathConverter
+from md2docx.omml_converter import MATH_NS, OmmlConverter
+
+
+def _read_document_xml(docx_path: Path) -> str:
+    """Read the main Word document XML from a DOCX file."""
+    with zipfile.ZipFile(docx_path) as docx:
+        return docx.read("word/document.xml").decode("utf-8")
 
 
 class TestMathConverter:
@@ -78,8 +86,61 @@ class TestMathConverter:
             converter.latex_to_image(r'\invalid{command', inline=True)
 
 
+class TestOmmlConverter:
+    """Test the OmmlConverter class."""
+
+    def test_latex_to_omml_returns_word_math_elements(self):
+        """Test generic LaTeX formulas are converted to Word math XML."""
+        converter = OmmlConverter()
+
+        elements = converter.latex_to_omml(
+            r'\sum_{i=1}^{n} x_i = \frac{n(n+1)}{2}',
+            inline=False,
+        )
+
+        assert elements
+        assert elements[0].tag == f'{{{MATH_NS}}}oMathPara'
+        assert elements[0].xpath('.//m:f', namespaces={'m': MATH_NS})
+
+
 class TestLatexRendering:
     """Test end-to-end LaTeX rendering in documents."""
+
+    def test_block_math_is_written_as_omml(self, tmp_path):
+        """Test block math is written as Word-native OMML, not an image."""
+        md_content = r"""
+$$
+E = Z \times \sqrt{\frac{p(1-p)}{n}}
+$$
+"""
+        output = tmp_path / "omml_block.docx"
+
+        converter = Converter()
+        converter.convert_string(md_content, str(output))
+
+        xml = _read_document_xml(output)
+        assert "<m:oMath" in xml
+        assert "<m:f" in xml
+        assert "<m:rad" in xml
+        assert "<w:drawing" not in xml
+
+    def test_latex_fenced_code_block_is_written_as_omml(self, tmp_path):
+        """Test latex fenced code blocks are treated as Word-native equations."""
+        md_content = r"""
+```latex
+n = \frac{Z^{2} \times p(1-p)}{E^{2}}
+```
+"""
+        output = tmp_path / "omml_latex_fence.docx"
+
+        converter = Converter()
+        converter.convert_string(md_content, str(output))
+
+        xml = _read_document_xml(output)
+        assert "<m:oMath" in xml
+        assert "<m:f" in xml
+        assert "<w:drawing" not in xml
+        assert "frac" not in xml
     
     def test_inline_math_conversion(self, tmp_path):
         """Test conversion of inline math formulas."""

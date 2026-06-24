@@ -51,6 +51,7 @@ class StyleManager:
             "alignment": "left",
             "header_alignment": "center",
             "header_vertical_alignment": "center",
+            "column_width_strategy": "content-weighted",
         },
         "list": {
             "bullet_char": "•",

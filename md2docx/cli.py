@@ -22,6 +22,16 @@ def _flatten_output_name(md_file: Path, root: Path) -> str:
     return f"{'_'.join(relative_path.parts)}.docx"
 
 
+def _ensure_output_available(
+    output_path: Path,
+    overwrite: bool,
+    parser: argparse.ArgumentParser,
+) -> None:
+    """Reject an existing output path unless explicit overwrite is enabled."""
+    if output_path.exists() and not overwrite:
+        parser.error(f"output already exists: {output_path}. Use --overwrite to replace it.")
+
+
 def main() -> None:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -65,6 +75,12 @@ def main() -> None:
         metavar='DIR',
         help='Directory to save converted Word documents (required when input is a directory)'
     )
+
+    parser.add_argument(
+        '--overwrite',
+        action='store_true',
+        help='Replace existing output DOCX files'
+    )
     
     parser.add_argument(
         '-t', '--template',
@@ -106,7 +122,7 @@ def main() -> None:
     elif args.output_dir:
         output_path = Path(args.output_dir) / input_path.with_suffix('.docx').name
     elif args.output:
-        output_path = args.output
+        output_path = Path(args.output)
     else:
         output_path = input_path.with_suffix('.docx')
     
@@ -128,14 +144,21 @@ def main() -> None:
                 sys.exit(1)
 
             output_dir = Path(args.output_dir)
-            for md_file in markdown_files:
-                output_path = output_dir / _flatten_output_name(md_file, input_path)
+            output_jobs = [
+                (md_file, output_dir / _flatten_output_name(md_file, input_path))
+                for md_file in markdown_files
+            ]
+            for _, output_path in output_jobs:
+                _ensure_output_available(output_path, args.overwrite, parser)
+
+            for md_file, output_path in output_jobs:
                 print(f"Converting {md_file} to {output_path}...")
                 converter.convert(str(md_file), str(output_path))
 
             print(f"✓ Conversion successful! Converted {len(markdown_files)} file(s). Output dir: {output_dir}")
         else:
             # Convert
+            _ensure_output_available(output_path, args.overwrite, parser)
             print(f"Converting {args.input} to {output_path}...")
             converter.convert(args.input, str(output_path))
             print(f"✓ Conversion successful! Output: {output_path}")

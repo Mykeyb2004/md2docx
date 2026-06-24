@@ -17,6 +17,9 @@ ls -lh test.docx
 ### 2. 指定输出文件
 ```bash
 uv run md2docx test.md --output-file my_output.docx
+
+# 如果输出文件已存在，需要明确允许覆盖
+uv run md2docx test.md --output-file my_output.docx --overwrite
 ```
 
 ### 3. 指定输出目录
@@ -64,4 +67,7 @@ uv run md2docx test.md -t default -s custom.yaml
 
 # 同时指定输出文件和输出目录（应该报错）
 uv run md2docx test.md --output-file custom.docx --output-dir converted
+
+# 输出文件已存在但未加 --overwrite（应该报错）
+uv run md2docx test.md --output-file test.docx
 ```

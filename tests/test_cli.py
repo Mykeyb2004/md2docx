@@ -48,6 +48,57 @@ def test_output_file_saves_docx_to_requested_path(tmp_path, monkeypatch):
     assert doc.paragraphs[0].text == "Report"
 
 
+def test_existing_output_file_requires_overwrite(tmp_path, monkeypatch, capsys):
+    """CLI should protect an existing output file unless --overwrite is set."""
+    input_path = tmp_path / "report.md"
+    output_path = tmp_path / "custom.docx"
+    input_path.write_text("# Report\n\nNew content.", encoding="utf-8")
+    output_path.write_text("keep me", encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["md2docx", str(input_path), "--output-file", str(output_path)],
+    )
+
+    try:
+        main()
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("Expected SystemExit when output exists")
+
+    captured = capsys.readouterr()
+    assert "output already exists" in captured.err
+    assert "--overwrite" in captured.err
+    assert output_path.read_text(encoding="utf-8") == "keep me"
+
+
+def test_overwrite_allows_existing_output_file(tmp_path, monkeypatch):
+    """--overwrite should allow replacing an existing output file."""
+    input_path = tmp_path / "report.md"
+    output_path = tmp_path / "custom.docx"
+    input_path.write_text("# Report\n\nReplacement content.", encoding="utf-8")
+    output_path.write_text("replace me", encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "md2docx",
+            str(input_path),
+            "--output-file",
+            str(output_path),
+            "--overwrite",
+        ],
+    )
+
+    main()
+
+    doc = Document(output_path)
+    assert doc.paragraphs[0].text == "Report"
+
+
 def test_legacy_output_alias_still_saves_docx(tmp_path, monkeypatch):
     """--output should remain accepted for existing scripts."""
     input_path = tmp_path / "report.md"
@@ -143,6 +194,7 @@ def test_help_prefers_output_file_name(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert "-o FILE, --output-file FILE" in captured.out
     assert "--output OUTPUT" not in captured.out
+    assert "--overwrite" in captured.out
     assert "-s FILE, --style-file FILE, --style-config FILE" in captured.out
 
 
@@ -171,3 +223,32 @@ def test_directory_input_recurses_and_flattens_output_names(tmp_path, monkeypatc
     assert not (output_dir / "ignore.docx").exists()
     assert Document(first_output).paragraphs[0].text == "A"
     assert Document(second_output).paragraphs[0].text == "B"
+
+
+def test_directory_output_refuses_existing_target_without_overwrite(tmp_path, monkeypatch, capsys):
+    """Directory conversion should not partially overwrite existing target files."""
+    source_root = tmp_path / "source"
+    output_dir = tmp_path / "converted"
+    (source_root / "a").mkdir(parents=True)
+    output_dir.mkdir()
+    (source_root / "a" / "report.md").write_text("# A\n\nFirst.", encoding="utf-8")
+    existing_output = output_dir / "a_report.docx"
+    existing_output.write_text("keep me", encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["md2docx", str(source_root), "--output-dir", str(output_dir)],
+    )
+
+    try:
+        main()
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("Expected SystemExit when directory output exists")
+
+    captured = capsys.readouterr()
+    assert "output already exists" in captured.err
+    assert "a_report.docx" in captured.err
+    assert existing_output.read_text(encoding="utf-8") == "keep me"
