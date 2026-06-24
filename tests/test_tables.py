@@ -24,6 +24,28 @@ def _width_spread(widths):
     return max(widths) - min(widths)
 
 
+def _cell_margin_twips(cell, side):
+    """Return one explicit table cell margin in twips."""
+    margins = cell._tc.tcPr.first_child_found_in("w:tcMar")
+    assert margins is not None
+    margin = margins.find(qn(f"w:{side}"))
+    assert margin is not None
+    value = margin.get(qn("w:w"))
+    assert value is not None
+    return int(value)
+
+
+def _row_repeats_as_header(row):
+    """Return True when a Word table row is marked to repeat as a header."""
+    tr_pr = row._tr.trPr
+    if tr_pr is None:
+        return False
+    tbl_header = tr_pr.find(qn("w:tblHeader"))
+    if tbl_header is None:
+        return False
+    return tbl_header.get(qn("w:val"), "true") != "false"
+
+
 def test_simple_table():
     """Test simple table conversion."""
     converter = Converter()
@@ -202,6 +224,58 @@ def test_table_header_is_centered_both_horizontally_and_vertically():
 
         assert header_paragraph.alignment == WD_PARAGRAPH_ALIGNMENT.CENTER
         assert header_cell.vertical_alignment == WD_CELL_VERTICAL_ALIGNMENT.CENTER
+    finally:
+        Path(output_path).unlink(missing_ok=True)
+
+
+def test_table_header_row_repeats_on_each_page():
+    """Test table header rows are marked for Word header repetition."""
+    converter = Converter()
+
+    md_content = """
+| 类型 | 主要特征 |
+|------|----------|
+| A | B |
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter.convert_string(md_content, output_path)
+        doc = Document(output_path)
+        table = doc.tables[0]
+
+        assert _row_repeats_as_header(table.rows[0])
+        assert not _row_repeats_as_header(table.rows[1])
+    finally:
+        Path(output_path).unlink(missing_ok=True)
+
+
+def test_table_body_cells_are_vertically_centered_with_line_spacing():
+    """Test table body cells default to vertical center while keeping line spacing."""
+    converter = Converter()
+
+    md_content = """
+| 类型 | 主要特征 |
+|------|----------|
+| 居民 | 反映居民识灾避险、预警响应和家庭应急准备。 |
+"""
+
+    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
+        output_path = f.name
+
+    try:
+        converter.convert_string(md_content, output_path)
+        doc = Document(output_path)
+        table = doc.tables[0]
+        body_cell = table.rows[1].cells[0]
+        body_paragraph = body_cell.paragraphs[0]
+
+        assert body_cell.vertical_alignment == WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        assert body_paragraph.paragraph_format.line_spacing == 1.5
+        assert _cell_margin_twips(body_cell, "top") == 60
+        assert _cell_margin_twips(body_cell, "bottom") == 60
     finally:
         Path(output_path).unlink(missing_ok=True)
 

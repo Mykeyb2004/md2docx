@@ -115,6 +115,9 @@ table:
   header_bold: true
   header_background: "#F2F2F2"
   header_alignment: center
+  vertical_alignment: center
+  cell_margin_vertical: 3pt
+  cell_margin_horizontal: 5.4pt
   header_vertical_alignment: center
   column_width_strategy: content-weighted  # content-weighted=按内容自动分配；balanced=更均衡保守
   border_color: "#CCCCCC"

@@ -115,6 +115,9 @@ table:
   header_bold: true
   header_background: "#F2F2F2"
   header_alignment: center
+  vertical_alignment: center
+  cell_margin_vertical: 3pt
+  cell_margin_horizontal: 5.4pt
   header_vertical_alignment: center
   border_color: "#CCCCCC"
   alignment: left

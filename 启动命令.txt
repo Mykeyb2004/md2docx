@@ -1,0 +1,4 @@
+启动 UI 的命令是：
+uv run md2docx-gui
+在项目根目录 /Users/zhangqijin/PycharmProjects/md2docx 运行即可。也可以用：
+uv run python -m md2docx.gui

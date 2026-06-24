@@ -333,6 +333,62 @@ class DocxRenderer(mistune.BaseRenderer):
                 tc_w.set(qn('w:type'), 'dxa')
                 tc_w.set(qn('w:w'), str(int(round(widths[col_idx] / 635))))
 
+    def _set_cell_margins(
+        self,
+        cell: Any,
+        *,
+        top: Optional[Any] = None,
+        bottom: Optional[Any] = None,
+        left: Optional[Any] = None,
+        right: Optional[Any] = None,
+    ) -> None:
+        """Set explicit Word table cell margins."""
+        margins = {
+            'top': top,
+            'bottom': bottom,
+            'left': left,
+            'right': right,
+        }
+        if all(value is None for value in margins.values()):
+            return
+
+        tc_pr = cell._tc.get_or_add_tcPr()
+        tc_mar = tc_pr.first_child_found_in('w:tcMar')
+        if tc_mar is None:
+            tc_mar = OxmlElement('w:tcMar')
+            tc_pr.append(tc_mar)
+
+        for side, value in margins.items():
+            if value is None:
+                continue
+            margin = tc_mar.find(qn(f'w:{side}'))
+            if margin is None:
+                margin = OxmlElement(f'w:{side}')
+                tc_mar.append(margin)
+            margin.set(qn('w:w'), str(int(round(self._parse_length(value) / 635))))
+            margin.set(qn('w:type'), 'dxa')
+
+    def _apply_table_cell_margins(self, cell: Any, table_style: Dict[str, Any]) -> None:
+        """Apply configured cell margins while preserving default horizontal padding."""
+        vertical_margin = table_style.get('cell_margin_vertical', '3pt')
+        horizontal_margin = table_style.get('cell_margin_horizontal', '5.4pt')
+        self._set_cell_margins(
+            cell,
+            top=vertical_margin,
+            bottom=vertical_margin,
+            left=horizontal_margin,
+            right=horizontal_margin,
+        )
+
+    def _set_row_repeats_as_table_header(self, row: Any) -> None:
+        """Mark a table row to repeat as the header row on each Word page."""
+        tr_pr = row._tr.get_or_add_trPr()
+        tbl_header = tr_pr.find(qn('w:tblHeader'))
+        if tbl_header is None:
+            tbl_header = OxmlElement('w:tblHeader')
+            tr_pr.append(tbl_header)
+        tbl_header.set(qn('w:val'), 'true')
+
     def _get_available_page_height(self):
         """Get the usable document height after subtracting page margins."""
         section = self.doc.sections[-1]
@@ -1714,6 +1770,7 @@ class DocxRenderer(mistune.BaseRenderer):
             return ''
         
         row = self._current_table.rows[self._current_row_idx]
+        self._set_row_repeats_as_table_header(row)
         
         for col_idx, cell_token in enumerate(cells):
             if col_idx < len(row.cells):
@@ -1742,6 +1799,7 @@ class DocxRenderer(mistune.BaseRenderer):
                 else:
                     p.alignment = self._get_alignment(header_alignment)
                 cell.vertical_alignment = self._get_vertical_alignment(header_vertical_alignment)
+                self._apply_table_cell_margins(cell, table_style)
                 
                 # Apply header styling - make all runs bold
                 for run in p.runs:
@@ -1801,10 +1859,17 @@ class DocxRenderer(mistune.BaseRenderer):
                     'font_size': table_style.get('font_size', '11pt')
                 }
                 self._add_formatted_text(p, text, base_style)
+
+                if 'line_spacing' in table_style:
+                    p.paragraph_format.line_spacing = table_style['line_spacing']
                 
                 # Apply column alignment, falling back to the configured table default.
                 align = cell_token.get('attrs', {}).get('align') or table_style.get('alignment', 'left')
                 p.alignment = self._get_alignment(str(align))
+
+                vertical_alignment = str(table_style.get('vertical_alignment', 'center')).lower()
+                cell.vertical_alignment = self._get_vertical_alignment(vertical_alignment)
+                self._apply_table_cell_margins(cell, table_style)
                 
                 # Apply alternating row background (zebra striping)
                 if alternating_rows:
