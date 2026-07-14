@@ -8,7 +8,7 @@ import tkinter as tk
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import colorchooser, filedialog, messagebox, ttk
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from md2docx import Converter
@@ -27,20 +27,117 @@ from md2docx.styles import StyleManager
 
 ConfigPath = Tuple[str, ...]
 
-FIELD_OPTIONS = {
+FIELD_WIDGET_ENTRY = "entry"
+FIELD_WIDGET_COMBOBOX = "combobox"
+FIELD_WIDGET_COLOR = "color"
+
+
+@dataclass(frozen=True)
+class FieldWidgetRule:
+    """Describe the editor widget to use for one config field."""
+
+    kind: str = FIELD_WIDGET_ENTRY
+    options: Tuple[str, ...] = ()
+    readonly: bool = False
+
+
+DEFAULT_FIELD_WIDGET_RULE = FieldWidgetRule()
+
+HEADING_SECTIONS = ("heading1", "heading2", "heading3", "heading4")
+STYLE_SECTIONS = (
+    "heading1",
+    "heading2",
+    "heading3",
+    "heading4",
+    "paragraph",
+    "code_block",
+    "table",
+    "list",
+)
+
+FONT_OPTIONS = (
+    "仿宋",
+    "宋体",
+    "黑体",
+    "楷体",
+    "微软雅黑",
+    "方正小标宋简体",
+    "Consolas",
+    "Courier New",
+    "Menlo",
+    "Monaco",
+)
+FONT_SIZE_OPTIONS = ("10.5pt", "11pt", "12pt", "14pt", "16pt", "18pt", "22pt")
+LINE_SPACING_OPTIONS = ("1.0", "1.15", "1.2", "1.5", "2.0")
+INDENT_OPTIONS = ("0", "2", "4")
+DPI_OPTIONS = ("150", "200", "300", "600")
+DIMENSION_OPTIONS = (
+    "0pt",
+    "3pt",
+    "5.4pt",
+    "6pt",
+    "12pt",
+    "0.15in",
+    "0.5in",
+    "3.2in",
+    "4in",
+    "5.5in",
+    "2.54cm",
+    "3.17cm",
+)
+HORIZONTAL_ALIGNMENT_OPTIONS = ("left", "center", "right", "justify")
+IMAGE_ALIGNMENT_OPTIONS = ("left", "center", "right")
+VERTICAL_ALIGNMENT_OPTIONS = ("top", "center", "bottom")
+HEADER_ALIGNMENT_OPTIONS = ("left", "center", "right", "justify", "inherit")
+LIST_BULLET_OPTIONS = ("•", "-", "*", "·", "○", "▪")
+NUMBER_FORMAT_OPTIONS = ("1.", "1)", "(1)")
+
+READONLY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
     ("document", "page_size"): ("A4", "A3", "Letter"),
-    ("heading1", "alignment"): ("left", "center", "right", "justify"),
-    ("heading2", "alignment"): ("left", "center", "right", "justify"),
-    ("heading3", "alignment"): ("left", "center", "right", "justify"),
-    ("heading4", "alignment"): ("left", "center", "right", "justify"),
-    ("paragraph", "alignment"): ("left", "center", "right", "justify"),
-    ("table", "alignment"): ("left", "center", "right", "justify"),
-    ("table", "header_alignment"): ("left", "center", "right", "justify", "inherit"),
-    ("table", "header_vertical_alignment"): ("top", "center", "bottom"),
+    ("heading1", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("heading2", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("heading3", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("heading4", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("paragraph", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("table", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("table", "header_alignment"): HEADER_ALIGNMENT_OPTIONS,
+    ("table", "vertical_alignment"): VERTICAL_ALIGNMENT_OPTIONS,
+    ("table", "header_vertical_alignment"): VERTICAL_ALIGNMENT_OPTIONS,
+    ("table", "column_width_strategy"): ("content-weighted", "balanced"),
+    ("math_block", "alignment"): IMAGE_ALIGNMENT_OPTIONS,
     ("mermaid", "format"): ("png", "svg", "pdf"),
     ("mermaid", "theme"): ("default", "base", "dark", "forest", "neutral"),
-    ("mermaid", "alignment"): ("left", "center", "right"),
+    ("mermaid", "alignment"): IMAGE_ALIGNMENT_OPTIONS,
     ("mermaid", "oversized_strategy"): ("page", "scale"),
+}
+
+# Backwards-compatible alias for existing code and callers.
+FIELD_OPTIONS = READONLY_FIELD_OPTIONS
+
+COLOR_FIELD_NAMES = {
+    "font_color",
+    "background",
+    "border_color",
+    "header_background",
+    "row_background_odd",
+    "row_background_even",
+    "background_color",
+}
+
+DIMENSION_FIELD_NAMES = {
+    "margin_top",
+    "margin_bottom",
+    "margin_left",
+    "margin_right",
+    "space_before",
+    "space_after",
+    "padding",
+    "width",
+    "height",
+    "indent_size",
+    "cell_margin_vertical",
+    "cell_margin_horizontal",
+    "min_readable_width",
 }
 
 SECTION_GROUPS = [
@@ -53,6 +150,63 @@ SECTION_GROUPS = [
     ("公式", ("math_inline", "math_block")),
     ("Mermaid", ("mermaid",)),
 ]
+
+
+def resolve_field_widget_rule(path: ConfigPath) -> FieldWidgetRule:
+    """Return the editor widget rule for a config path."""
+    if not path:
+        return DEFAULT_FIELD_WIDGET_RULE
+
+    readonly_options = READONLY_FIELD_OPTIONS.get(path)
+    if readonly_options is not None:
+        return FieldWidgetRule(
+            kind=FIELD_WIDGET_COMBOBOX,
+            options=readonly_options,
+            readonly=True,
+        )
+
+    section = path[0]
+    field_name = path[-1]
+
+    if field_name in COLOR_FIELD_NAMES:
+        return FieldWidgetRule(kind=FIELD_WIDGET_COLOR)
+
+    if section == "mermaid" and len(path) >= 3 and path[1] == "theme_variables":
+        return FieldWidgetRule(kind=FIELD_WIDGET_COLOR)
+
+    if field_name == "font_name" and (
+        section in STYLE_SECTIONS or path[:2] == ("inline", "code")
+    ):
+        return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=FONT_OPTIONS)
+
+    if field_name == "font_size":
+        return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=FONT_SIZE_OPTIONS)
+
+    if field_name == "line_spacing":
+        return FieldWidgetRule(
+            kind=FIELD_WIDGET_COMBOBOX,
+            options=LINE_SPACING_OPTIONS,
+        )
+
+    if field_name == "first_line_indent":
+        return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=INDENT_OPTIONS)
+
+    if field_name == "dpi":
+        return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=DPI_OPTIONS)
+
+    if field_name in DIMENSION_FIELD_NAMES:
+        return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=DIMENSION_OPTIONS)
+
+    if path == ("list", "bullet_char"):
+        return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=LIST_BULLET_OPTIONS)
+
+    if path == ("list", "number_format"):
+        return FieldWidgetRule(
+            kind=FIELD_WIDGET_COMBOBOX,
+            options=NUMBER_FORMAT_OPTIONS,
+        )
+
+    return DEFAULT_FIELD_WIDGET_RULE
 
 
 def center_window_on_screen(window: tk.Misc) -> None:
