@@ -498,13 +498,19 @@ class Md2docxGUI:
         """Initialize GUI application."""
         self.root = root
         self.root.title("Markdown to Word Converter")
-        self.root.geometry("900x640")
+        self.root.geometry("900x680")
         self.root.resizable(True, True)
 
-        self.history_file = Path.home() / ".md2docx" / "history.json"
-        self.history_file.parent.mkdir(parents=True, exist_ok=True)
+        app_state_dir = Path.home() / ".md2docx"
+        app_state_dir.mkdir(parents=True, exist_ok=True)
+        self.history_file = app_state_dir / "history.json"
+        self.preferences_file = app_state_dir / "preferences.json"
+        self.packaged_default_config_path = (
+            Path(__file__).resolve().parent / "templates" / "default.yaml"
+        )
         self.default_config_path = StyleManager.get_editable_template_path("default")
         self.config_editor: Optional[ConfigEditorWindow] = None
+        self.config_file_var = tk.StringVar(value=str(self.load_selected_config_path()))
         self.auto_fix_tables_var = tk.BooleanVar(value=self.load_auto_fix_tables_setting())
 
         self.history = self.load_history()
@@ -577,18 +583,35 @@ class Md2docxGUI:
         )
         output_btn.grid(row=1, column=2, padx=5)
 
+        ttk.Label(conv_frame, text="Config File:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        config_entry = ttk.Entry(
+            conv_frame,
+            textvariable=self.config_file_var,
+            width=50,
+            state="readonly",
+        )
+        config_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=5)
+
+        config_btn = ttk.Button(
+            conv_frame,
+            text="Browse...",
+            command=self.browse_config_file,
+            width=12,
+        )
+        config_btn.grid(row=2, column=2, padx=5)
+
         table_fix_toggle = ttk.Checkbutton(
             conv_frame,
             text="自动修复不规范表格（补 separator）",
             variable=self.auto_fix_tables_var,
         )
-        table_fix_toggle.grid(row=2, column=1, columnspan=2, sticky=tk.W, padx=5, pady=(6, 0))
+        table_fix_toggle.grid(row=3, column=1, columnspan=2, sticky=tk.W, padx=5, pady=(6, 0))
 
         self.progress = ttk.Progressbar(conv_frame, mode="indeterminate", length=240)
-        self.progress.grid(row=3, column=0, pady=(15, 0), sticky=(tk.W, tk.E))
+        self.progress.grid(row=4, column=0, pady=(15, 0), sticky=(tk.W, tk.E))
 
         action_frame = ttk.Frame(conv_frame)
-        action_frame.grid(row=3, column=1, columnspan=2, pady=(15, 0), sticky=tk.E)
+        action_frame.grid(row=4, column=1, columnspan=2, pady=(15, 0), sticky=tk.E)
 
         ttk.Button(
             action_frame,
@@ -685,6 +708,23 @@ class Md2docxGUI:
         if filename:
             self.output_var.set(filename)
 
+    def browse_config_file(self) -> None:
+        """Open file dialog to select the YAML configuration file."""
+        filename = filedialog.askopenfilename(
+            title="Select Configuration File",
+            filetypes=[
+                ("YAML files", "*.yaml *.yml"),
+                ("All files", "*.*"),
+            ],
+        )
+
+        if filename:
+            config_path = Path(filename)
+            self.config_file_var.set(str(config_path))
+            self.save_selected_config_path(config_path)
+            self.auto_fix_tables_var.set(self.load_auto_fix_tables_setting())
+            self.status_var.set(f"Config selected: {config_path}")
+
     def open_config_editor(self) -> None:
         """Open the configuration popup from the main window."""
         if self.config_editor and self.config_editor.window.winfo_exists():
@@ -697,16 +737,66 @@ class Md2docxGUI:
 
     def on_config_saved(self, config_path: Path) -> None:
         """Handle successful config saves from the popup."""
+        self.config_file_var.set(str(config_path))
+        self.save_selected_config_path(config_path)
         self.auto_fix_tables_var.set(self.load_auto_fix_tables_setting())
-        self.status_var.set(f"Default config saved: {config_path}")
+        self.status_var.set(f"Default config saved and selected: {config_path}")
+
+    def load_selected_config_path(self) -> Path:
+        """Load the user's selected conversion config path."""
+        try:
+            if self.preferences_file.exists():
+                with open(self.preferences_file, "r", encoding="utf-8") as handle:
+                    loaded = json.load(handle)
+
+                if isinstance(loaded, dict):
+                    config_file = loaded.get("config_file")
+                    if isinstance(config_file, str) and config_file:
+                        config_path = Path(config_file).expanduser()
+                        if config_path.exists():
+                            return config_path
+        except Exception:
+            pass
+
+        return self.packaged_default_config_path
+
+    def save_selected_config_path(self, config_path: Path) -> None:
+        """Persist the user's selected conversion config path."""
+        try:
+            self.preferences_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.preferences_file, "w", encoding="utf-8") as handle:
+                json.dump(
+                    {"config_file": str(config_path)},
+                    handle,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+        except Exception as exc:
+            print(f"Failed to save preferences: {exc}")
+
+    def get_selected_config_path(self) -> Path:
+        """Return the current config path, falling back to the bundled default."""
+        config_file = self.config_file_var.get().strip()
+        config_path = (
+            Path(config_file).expanduser()
+            if config_file
+            else self.packaged_default_config_path
+        )
+
+        if config_path.exists():
+            return config_path
+
+        self.config_file_var.set(str(self.packaged_default_config_path))
+        return self.packaged_default_config_path
 
     def load_auto_fix_tables_setting(self) -> bool:
-        """Load the current default value for malformed-table auto-fixing."""
+        """Load the selected config value for malformed-table auto-fixing."""
         config = StyleManager.load_packaged_template("default")
+        config_path = self.get_selected_config_path()
 
-        if self.default_config_path.exists():
+        if config_path.exists():
             try:
-                config = merge_config(config, load_yaml_config(self.default_config_path))
+                config = merge_config(config, load_yaml_config(config_path))
             except Exception:
                 pass
 
@@ -747,10 +837,12 @@ class Md2docxGUI:
             self.root.after(0, self.progress.start)
             self.root.after(0, lambda: self.status_var.set("Converting..."))
             config_override = self.build_runtime_config_override()
+            config_path = self.get_selected_config_path()
 
-            if self.default_config_path.exists():
+            if config_path.exists():
+                self.save_selected_config_path(config_path)
                 converter = Converter(
-                    style_config=str(self.default_config_path),
+                    style_config=str(config_path),
                     config_override=config_override,
                 )
             else:
