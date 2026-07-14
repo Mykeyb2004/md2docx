@@ -539,6 +539,56 @@ class ConfigEditorWindow:
         widget = self.create_field_widget(row, path, data, schema)
         widget.grid(row=0, column=1, sticky=(tk.W, tk.E))
 
+    def create_color_field_widget(
+        self,
+        parent: ttk.Frame,
+        variable: tk.StringVar,
+    ) -> ttk.Frame:
+        """Create a color swatch, text input, and chooser button."""
+        frame = ttk.Frame(parent)
+        frame.columnconfigure(1, weight=1)
+
+        preview = tk.Label(frame, width=3, relief=tk.SOLID, borderwidth=1)
+        preview.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 6))
+
+        entry = ttk.Entry(frame, textvariable=variable)
+        entry.grid(row=0, column=1, sticky=(tk.W, tk.E))
+
+        ttk.Button(
+            frame,
+            text="选择",
+            command=lambda: self.choose_color(variable),
+        ).grid(row=0, column=2, sticky=tk.E, padx=(6, 0))
+
+        variable.trace_add(
+            "write",
+            lambda *_args, widget=preview, value=variable: self.update_color_preview(
+                widget,
+                value.get(),
+            ),
+        )
+        self.update_color_preview(preview, variable.get())
+        return frame
+
+    def update_color_preview(self, preview: tk.Label, raw_value: Any) -> None:
+        """Refresh the swatch for a text color value."""
+        color_value = normalize_color_preview(raw_value)
+        if color_value is None:
+            preview.configure(background="#FFFFFF", text="")
+            return
+
+        preview.configure(background=color_value, text="")
+
+    def choose_color(self, variable: tk.StringVar) -> None:
+        """Open the system color chooser and write the selected hex value."""
+        initial_color = normalize_color_preview(variable.get())
+        _rgb, selected = colorchooser.askcolor(
+            color=initial_color,
+            parent=self.window,
+        )
+        if selected:
+            variable.set(selected.upper())
+
     def create_field_widget(
         self,
         parent: ttk.Frame,
@@ -555,11 +605,18 @@ class ConfigEditorWindow:
             self.field_bindings.append(FieldBinding(path=path, variable=variable, schema_value=expected_value))
             return widget
 
-        options = FIELD_OPTIONS.get(path)
         variable = tk.StringVar(value=format_config_value(value))
+        rule = resolve_field_widget_rule(path)
 
-        if options:
-            widget = ttk.Combobox(parent, textvariable=variable, values=options, state="readonly")
+        if rule.kind == FIELD_WIDGET_COLOR:
+            widget = self.create_color_field_widget(parent, variable)
+        elif rule.kind == FIELD_WIDGET_COMBOBOX:
+            widget = ttk.Combobox(
+                parent,
+                textvariable=variable,
+                values=rule.options,
+                state="readonly" if rule.readonly else "normal",
+            )
         else:
             widget = ttk.Entry(parent, textvariable=variable)
 
