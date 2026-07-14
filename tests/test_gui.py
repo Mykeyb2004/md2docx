@@ -158,3 +158,74 @@ def test_gui_conversion_uses_selected_config_file(tmp_path: Path, monkeypatch):
     assert captured["style_config"] == str(selected_config)
     assert captured["config_override"] == {"document": {"auto_fix_tables": False}}
     assert captured["convert"] == ("input.md", "output.docx")
+
+
+def test_config_editor_rule_uses_editable_combobox_for_font_fields():
+    """Frequent font fields should offer suggestions without blocking custom fonts."""
+    rule = gui_module.resolve_field_widget_rule(("heading1", "font_name"))
+
+    assert rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert rule.readonly is False
+    assert "仿宋" in rule.options
+    assert "Consolas" in rule.options
+
+
+def test_config_editor_rule_uses_color_control_for_color_fields():
+    """Frequent color fields should render as color composite controls."""
+    assert (
+        gui_module.resolve_field_widget_rule(("heading1", "font_color")).kind
+        == gui_module.FIELD_WIDGET_COLOR
+    )
+    assert (
+        gui_module.resolve_field_widget_rule(("table", "header_background")).kind
+        == gui_module.FIELD_WIDGET_COLOR
+    )
+    assert (
+        gui_module.resolve_field_widget_rule(
+            ("mermaid", "theme_variables", "primaryColor")
+        ).kind
+        == gui_module.FIELD_WIDGET_COLOR
+    )
+
+
+def test_config_editor_rule_keeps_fixed_enums_readonly():
+    """Known fixed-value fields should prevent unsupported free text."""
+    page_rule = gui_module.resolve_field_widget_rule(("document", "page_size"))
+    table_rule = gui_module.resolve_field_widget_rule(
+        ("table", "column_width_strategy")
+    )
+
+    assert page_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert page_rule.readonly is True
+    assert page_rule.options == ("A4", "A3", "Letter")
+    assert table_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert table_rule.readonly is True
+    assert table_rule.options == ("content-weighted", "balanced")
+
+
+def test_config_editor_rule_keeps_common_sizes_editable():
+    """Sizes, spacing, and numeric values should remain editable suggestions."""
+    margin_rule = gui_module.resolve_field_widget_rule(("document", "margin_top"))
+    spacing_rule = gui_module.resolve_field_widget_rule(("paragraph", "line_spacing"))
+    indent_rule = gui_module.resolve_field_widget_rule(
+        ("paragraph", "first_line_indent")
+    )
+
+    assert margin_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert margin_rule.readonly is False
+    assert "2.54cm" in margin_rule.options
+    assert spacing_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert spacing_rule.readonly is False
+    assert "1.5" in spacing_rule.options
+    assert indent_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert indent_rule.readonly is False
+    assert "2" in indent_rule.options
+
+
+def test_config_editor_rule_leaves_unknown_fields_as_entry():
+    """Imported or unsupported fields should retain the existing plain input path."""
+    rule = gui_module.resolve_field_widget_rule(("custom", "unrecognized"))
+
+    assert rule.kind == gui_module.FIELD_WIDGET_ENTRY
+    assert rule.options == ()
+    assert rule.readonly is False
