@@ -23,12 +23,40 @@ class _FakeStringVar:
 
     def __init__(self, value: str = "") -> None:
         self.value = value
+        self.callbacks = []
 
     def get(self) -> str:
         return self.value
 
     def set(self, value: str) -> None:
         self.value = value
+        for callback in self.callbacks:
+            callback()
+
+    def trace_add(self, _mode: str, callback) -> str:
+        self.callbacks.append(callback)
+        return f"trace-{len(self.callbacks)}"
+
+
+class _FakeWidget:
+    """Minimal Tk widget stand-in that records construction and layout calls."""
+
+    def __init__(self, widget_type: str, *args, **kwargs) -> None:
+        self.widget_type = widget_type
+        self.args = args
+        self.kwargs = kwargs
+        self.columnconfigure_calls = []
+        self.grid_calls = []
+        self.configured = {}
+
+    def columnconfigure(self, *args, **kwargs) -> None:
+        self.columnconfigure_calls.append((args, kwargs))
+
+    def grid(self, *args, **kwargs) -> None:
+        self.grid_calls.append((args, kwargs))
+
+    def configure(self, **kwargs) -> None:
+        self.configured.update(kwargs)
 
 
 class _FakeProgress:
@@ -242,3 +270,138 @@ def test_normalize_color_preview_rejects_empty_null_and_named_values():
     assert gui_module.normalize_color_preview("") is None
     assert gui_module.normalize_color_preview("null") is None
     assert gui_module.normalize_color_preview("white") is None
+
+
+def test_config_editor_create_field_widget_dispatches_enhanced_controls(monkeypatch):
+    """Field widget creation should use the resolved high-frequency control rules."""
+    def make_widget(widget_type):
+        def factory(*args, **kwargs):
+            return _FakeWidget(widget_type, *args, **kwargs)
+
+        return factory
+
+    def create_color_widget(_self, parent, variable):
+        return _FakeWidget("color", parent, variable=variable)
+
+    monkeypatch.setattr(gui_module.tk, "BooleanVar", _FakeBooleanVar)
+    monkeypatch.setattr(gui_module.tk, "StringVar", _FakeStringVar)
+    monkeypatch.setattr(gui_module.ttk, "Checkbutton", make_widget("checkbutton"))
+    monkeypatch.setattr(gui_module.ttk, "Combobox", make_widget("combobox"))
+    monkeypatch.setattr(gui_module.ttk, "Entry", make_widget("entry"))
+    monkeypatch.setattr(
+        gui_module.ConfigEditorWindow,
+        "create_color_field_widget",
+        create_color_widget,
+    )
+
+    editor = gui_module.ConfigEditorWindow.__new__(gui_module.ConfigEditorWindow)
+    editor.field_bindings = []
+    parent = object()
+
+    checkbox = editor.create_field_widget(
+        parent,
+        ("document", "auto_fix_tables"),
+        True,
+        False,
+    )
+    color = editor.create_field_widget(
+        parent,
+        ("heading1", "font_color"),
+        "#24292e",
+        "#000000",
+    )
+    editable_combo = editor.create_field_widget(
+        parent,
+        ("heading1", "font_name"),
+        "CustomFont",
+        "",
+    )
+    readonly_combo = editor.create_field_widget(
+        parent,
+        ("document", "page_size"),
+        "A4",
+        "A4",
+    )
+    entry = editor.create_field_widget(parent, ("custom", "field"), "value", "")
+
+    assert checkbox.widget_type == "checkbutton"
+    assert isinstance(editor.field_bindings[0].variable, _FakeBooleanVar)
+    assert editor.field_bindings[0].variable.get() is True
+
+    assert color.widget_type == "color"
+    assert color.kwargs["variable"].get() == "#24292e"
+
+    assert editable_combo.widget_type == "combobox"
+    assert editable_combo.kwargs["state"] == "normal"
+    assert "仿宋" in editable_combo.kwargs["values"]
+
+    assert readonly_combo.widget_type == "combobox"
+    assert readonly_combo.kwargs["state"] == "readonly"
+    assert readonly_combo.kwargs["values"] == ("A4", "A3", "Letter")
+
+    assert entry.widget_type == "entry"
+    assert len(editor.field_bindings) == 5
+
+
+def test_config_editor_color_field_widget_wires_preview_entry_and_button(monkeypatch):
+    """The color composite control should keep text input as the source of truth."""
+    created = {}
+
+    def make_widget(widget_type):
+        def factory(*args, **kwargs):
+            widget = _FakeWidget(widget_type, *args, **kwargs)
+            created.setdefault(widget_type, []).append(widget)
+            return widget
+
+        return factory
+
+    monkeypatch.setattr(gui_module.ttk, "Frame", make_widget("frame"))
+    monkeypatch.setattr(gui_module.tk, "Label", make_widget("label"))
+    monkeypatch.setattr(gui_module.ttk, "Entry", make_widget("entry"))
+    monkeypatch.setattr(gui_module.ttk, "Button", make_widget("button"))
+
+    editor = gui_module.ConfigEditorWindow.__new__(gui_module.ConfigEditorWindow)
+    variable = _FakeStringVar("#abc")
+
+    frame = editor.create_color_field_widget(object(), variable)
+
+    assert frame.widget_type == "frame"
+    assert frame.columnconfigure_calls == [((1,), {"weight": 1})]
+    assert created["entry"][0].kwargs["textvariable"] is variable
+    assert created["button"][0].kwargs["text"] == "选择"
+    assert callable(created["button"][0].kwargs["command"])
+    assert created["label"][0].configured["background"] == "#AABBCC"
+
+    variable.set("white")
+
+    assert created["label"][0].configured["background"] == "#FFFFFF"
+
+
+def test_config_editor_choose_color_writes_selected_hex(monkeypatch):
+    """Choosing a system color should update the field text with uppercase hex."""
+    editor = gui_module.ConfigEditorWindow.__new__(gui_module.ConfigEditorWindow)
+    editor.window = object()
+    calls = []
+
+    def choose_color(**kwargs):
+        calls.append(kwargs)
+        return (None, "#a1b2c3")
+
+    monkeypatch.setattr(gui_module.colorchooser, "askcolor", choose_color)
+    variable = _FakeStringVar("#123")
+
+    editor.choose_color(variable)
+
+    assert calls == [{"color": "#112233", "parent": editor.window}]
+    assert variable.get() == "#A1B2C3"
+
+    monkeypatch.setattr(
+        gui_module.colorchooser,
+        "askcolor",
+        lambda **_kwargs: (None, None),
+    )
+    variable.set("#445566")
+
+    editor.choose_color(variable)
+
+    assert variable.get() == "#445566"
