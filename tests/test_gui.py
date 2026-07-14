@@ -229,3 +229,16 @@ def test_config_editor_rule_leaves_unknown_fields_as_entry():
     assert rule.kind == gui_module.FIELD_WIDGET_ENTRY
     assert rule.options == ()
     assert rule.readonly is False
+
+
+def test_normalize_color_preview_accepts_long_and_short_hex_values():
+    """Preview helper should normalize supported hex colors for the swatch."""
+    assert gui_module.normalize_color_preview("#24292e") == "#24292E"
+    assert gui_module.normalize_color_preview("D14") == "#DD1144"
+
+
+def test_normalize_color_preview_rejects_empty_null_and_named_values():
+    """Unsupported preview values should remain editable text without swatch errors."""
+    assert gui_module.normalize_color_preview("") is None
+    assert gui_module.normalize_color_preview("null") is None
+    assert gui_module.normalize_color_preview("white") is None
