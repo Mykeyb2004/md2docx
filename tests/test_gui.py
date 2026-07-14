@@ -250,6 +250,25 @@ def test_config_editor_rule_keeps_common_sizes_editable():
     assert "2" in indent_rule.options
 
 
+def test_config_editor_rule_covers_nested_default_fields_after_path_gating():
+    """Known nested default-template fields should still use enhanced controls."""
+    inline_color_rule = gui_module.resolve_field_widget_rule(
+        ("inline", "code", "background")
+    )
+    math_height_rule = gui_module.resolve_field_widget_rule(("math_inline", "height"))
+    mermaid_width_rule = gui_module.resolve_field_widget_rule(("mermaid", "width"))
+    table_margin_rule = gui_module.resolve_field_widget_rule(
+        ("table", "cell_margin_horizontal")
+    )
+    math_dpi_rule = gui_module.resolve_field_widget_rule(("math_block", "dpi"))
+
+    assert inline_color_rule.kind == gui_module.FIELD_WIDGET_COLOR
+    assert math_height_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert mermaid_width_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert table_margin_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert math_dpi_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+
+
 def test_config_editor_rule_leaves_unknown_fields_as_entry():
     """Imported or unsupported fields should retain the existing plain input path."""
     rule = gui_module.resolve_field_widget_rule(("custom", "unrecognized"))
@@ -257,6 +276,21 @@ def test_config_editor_rule_leaves_unknown_fields_as_entry():
     assert rule.kind == gui_module.FIELD_WIDGET_ENTRY
     assert rule.options == ()
     assert rule.readonly is False
+
+
+def test_config_editor_rule_leaves_custom_name_collisions_as_entry():
+    """Unknown sections should not inherit enhanced controls by leaf-name collision."""
+    for path in (
+        ("custom", "background"),
+        ("custom", "font_size"),
+        ("custom", "width"),
+        ("custom", "dpi"),
+    ):
+        rule = gui_module.resolve_field_widget_rule(path)
+
+        assert rule.kind == gui_module.FIELD_WIDGET_ENTRY
+        assert rule.options == ()
+        assert rule.readonly is False
 
 
 def test_normalize_color_preview_accepts_long_and_short_hex_values():
