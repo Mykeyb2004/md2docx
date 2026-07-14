@@ -293,6 +293,20 @@ def test_config_editor_rule_leaves_custom_name_collisions_as_entry():
         assert rule.readonly is False
 
 
+def test_config_editor_rule_leaves_nested_unknown_font_names_as_entry():
+    """Unknown nested fields should not inherit font controls from known parents."""
+    for path in (
+        ("paragraph", "custom", "font_name"),
+        ("table", "custom", "font_name"),
+        ("inline", "code", "custom", "font_name"),
+    ):
+        rule = gui_module.resolve_field_widget_rule(path)
+
+        assert rule.kind == gui_module.FIELD_WIDGET_ENTRY
+        assert rule.options == ()
+        assert rule.readonly is False
+
+
 def test_normalize_color_preview_accepts_long_and_short_hex_values():
     """Preview helper should normalize supported hex colors for the swatch."""
     assert gui_module.normalize_color_preview("#24292e") == "#24292E"
