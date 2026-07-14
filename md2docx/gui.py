@@ -146,6 +146,11 @@ COLOR_FIELD_PATHS = {
     ("mermaid", "background_color"),
 }
 
+FONT_NAME_FIELD_PATHS = {
+    *((section, "font_name") for section in STYLE_SECTIONS),
+    ("inline", "code", "font_name"),
+}
+
 FONT_SIZE_FIELD_PATHS = {
     *((section, "font_size") for section in STYLE_SECTIONS),
     ("inline", "code", "font_size"),
@@ -232,9 +237,7 @@ def resolve_field_widget_rule(path: ConfigPath) -> FieldWidgetRule:
     if section == "mermaid" and len(path) >= 3 and path[1] == "theme_variables":
         return FieldWidgetRule(kind=FIELD_WIDGET_COLOR)
 
-    if field_name == "font_name" and (
-        section in STYLE_SECTIONS or path[:2] == ("inline", "code")
-    ):
+    if path in FONT_NAME_FIELD_PATHS:
         return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=FONT_OPTIONS)
 
     if path in FONT_SIZE_FIELD_PATHS:
