@@ -225,6 +225,24 @@ def resolve_field_widget_rule(path: ConfigPath) -> FieldWidgetRule:
     return DEFAULT_FIELD_WIDGET_RULE
 
 
+def normalize_color_preview(raw_value: Any) -> Optional[str]:
+    """Normalize a hex color for preview, returning None for unsupported text."""
+    text = str(raw_value or "").strip()
+    if not text or text.lower() == "null":
+        return None
+
+    if text.startswith("#"):
+        text = text[1:]
+
+    if len(text) == 3 and all(char in "0123456789abcdefABCDEF" for char in text):
+        text = "".join(char * 2 for char in text)
+
+    if len(text) == 6 and all(char in "0123456789abcdefABCDEF" for char in text):
+        return f"#{text.upper()}"
+
+    return None
+
+
 def center_window_on_screen(window: tk.Misc) -> None:
     """Place a Tk window in the center of the current screen."""
     window.update_idletasks()
