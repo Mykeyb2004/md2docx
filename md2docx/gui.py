@@ -229,7 +229,6 @@ def resolve_field_widget_rule(path: ConfigPath) -> FieldWidgetRule:
         )
 
     section = path[0]
-    field_name = path[-1]
 
     if path in COLOR_FIELD_PATHS:
         return FieldWidgetRule(kind=FIELD_WIDGET_COLOR)
