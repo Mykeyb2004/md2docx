@@ -111,8 +111,24 @@ READONLY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
     ("mermaid", "oversized_strategy"): ("page", "scale"),
 }
 
-# Backwards-compatible alias for existing code and callers.
-FIELD_OPTIONS = READONLY_FIELD_OPTIONS
+LEGACY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
+    ("document", "page_size"): ("A4", "A3", "Letter"),
+    ("heading1", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("heading2", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("heading3", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("heading4", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("paragraph", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("table", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
+    ("table", "header_alignment"): HEADER_ALIGNMENT_OPTIONS,
+    ("table", "header_vertical_alignment"): VERTICAL_ALIGNMENT_OPTIONS,
+    ("mermaid", "format"): ("png", "svg", "pdf"),
+    ("mermaid", "theme"): ("default", "base", "dark", "forest", "neutral"),
+    ("mermaid", "alignment"): IMAGE_ALIGNMENT_OPTIONS,
+    ("mermaid", "oversized_strategy"): ("page", "scale"),
+}
+
+# Backwards-compatible alias for the currently wired editor path.
+FIELD_OPTIONS = LEGACY_FIELD_OPTIONS
 
 COLOR_FIELD_NAMES = {
     "font_color",
