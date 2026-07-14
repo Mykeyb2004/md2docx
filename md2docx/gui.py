@@ -127,33 +127,75 @@ LEGACY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
     ("mermaid", "oversized_strategy"): ("page", "scale"),
 }
 
-# Backwards-compatible alias for the currently wired editor path.
+# Legacy public mapping for callers that inspect the previous fixed enum options.
+# The enhanced editor uses resolve_field_widget_rule() for richer widget metadata.
 FIELD_OPTIONS = LEGACY_FIELD_OPTIONS
 
-COLOR_FIELD_NAMES = {
-    "font_color",
-    "background",
-    "border_color",
-    "header_background",
-    "row_background_odd",
-    "row_background_even",
-    "background_color",
+COLOR_FIELD_PATHS = {
+    *((section, "font_color") for section in STYLE_SECTIONS),
+    ("inline", "bold", "font_color"),
+    ("inline", "italic", "font_color"),
+    ("inline", "code", "font_color"),
+    ("inline", "code", "background"),
+    ("code_block", "background"),
+    ("code_block", "border_color"),
+    ("table", "header_background"),
+    ("table", "border_color"),
+    ("table", "row_background_odd"),
+    ("table", "row_background_even"),
+    ("mermaid", "background_color"),
 }
 
-DIMENSION_FIELD_NAMES = {
-    "margin_top",
-    "margin_bottom",
-    "margin_left",
-    "margin_right",
-    "space_before",
-    "space_after",
-    "padding",
-    "width",
-    "height",
-    "indent_size",
-    "cell_margin_vertical",
-    "cell_margin_horizontal",
-    "min_readable_width",
+FONT_SIZE_FIELD_PATHS = {
+    *((section, "font_size") for section in STYLE_SECTIONS),
+    ("inline", "code", "font_size"),
+}
+
+LINE_SPACING_FIELD_PATHS = {
+    ("document", "line_spacing"),
+    ("paragraph", "line_spacing"),
+    ("code_block", "line_spacing"),
+    ("table", "line_spacing"),
+    ("list", "line_spacing"),
+}
+
+FIRST_LINE_INDENT_FIELD_PATHS = {
+    *((section, "first_line_indent") for section in HEADING_SECTIONS),
+    ("paragraph", "first_line_indent"),
+}
+
+DPI_FIELD_PATHS = {
+    ("math_inline", "dpi"),
+    ("math_block", "dpi"),
+}
+
+DIMENSION_FIELD_PATHS = {
+    *(
+        (section, field_name)
+        for section in HEADING_SECTIONS
+        for field_name in ("space_before", "space_after")
+    ),
+    ("document", "margin_top"),
+    ("document", "margin_bottom"),
+    ("document", "margin_left"),
+    ("document", "margin_right"),
+    ("paragraph", "space_before"),
+    ("paragraph", "space_after"),
+    ("code_block", "space_before"),
+    ("code_block", "space_after"),
+    ("code_block", "padding"),
+    ("table", "cell_margin_vertical"),
+    ("table", "cell_margin_horizontal"),
+    ("list", "indent_size"),
+    ("list", "space_after"),
+    ("math_inline", "height"),
+    ("math_block", "width"),
+    ("math_block", "space_before"),
+    ("math_block", "space_after"),
+    ("mermaid", "width"),
+    ("mermaid", "space_before"),
+    ("mermaid", "space_after"),
+    ("mermaid", "min_readable_width"),
 }
 
 SECTION_GROUPS = [
@@ -184,7 +226,7 @@ def resolve_field_widget_rule(path: ConfigPath) -> FieldWidgetRule:
     section = path[0]
     field_name = path[-1]
 
-    if field_name in COLOR_FIELD_NAMES:
+    if path in COLOR_FIELD_PATHS:
         return FieldWidgetRule(kind=FIELD_WIDGET_COLOR)
 
     if section == "mermaid" and len(path) >= 3 and path[1] == "theme_variables":
@@ -195,22 +237,22 @@ def resolve_field_widget_rule(path: ConfigPath) -> FieldWidgetRule:
     ):
         return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=FONT_OPTIONS)
 
-    if field_name == "font_size":
+    if path in FONT_SIZE_FIELD_PATHS:
         return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=FONT_SIZE_OPTIONS)
 
-    if field_name == "line_spacing":
+    if path in LINE_SPACING_FIELD_PATHS:
         return FieldWidgetRule(
             kind=FIELD_WIDGET_COMBOBOX,
             options=LINE_SPACING_OPTIONS,
         )
 
-    if field_name == "first_line_indent":
+    if path in FIRST_LINE_INDENT_FIELD_PATHS:
         return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=INDENT_OPTIONS)
 
-    if field_name == "dpi":
+    if path in DPI_FIELD_PATHS:
         return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=DPI_OPTIONS)
 
-    if field_name in DIMENSION_FIELD_NAMES:
+    if path in DIMENSION_FIELD_PATHS:
         return FieldWidgetRule(kind=FIELD_WIDGET_COMBOBOX, options=DIMENSION_OPTIONS)
 
     if path == ("list", "bullet_char"):
