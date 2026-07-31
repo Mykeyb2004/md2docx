@@ -46,6 +46,7 @@ class StyleManager:
             "line_spacing": 1.5
         },
         "table": {
+            "layout": "accent_grid",
             "style": "Light Grid Accent 1",
             "font_size": "11pt",
             "alignment": "left",
