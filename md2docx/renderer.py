@@ -15,6 +15,18 @@ from io import BytesIO
 from urllib.parse import unquote
 
 
+TABLE_LAYOUT_ACCENT_GRID = "accent_grid"
+TABLE_LAYOUT_THREE_LINE = "three_line"
+TABLE_LAYOUT_PLAIN_GRID = "plain_grid"
+TABLE_LAYOUTS = frozenset(
+    {
+        TABLE_LAYOUT_ACCENT_GRID,
+        TABLE_LAYOUT_THREE_LINE,
+        TABLE_LAYOUT_PLAIN_GRID,
+    }
+)
+
+
 class DocxRenderer(mistune.BaseRenderer):
     """Custom mistune renderer that outputs to python-docx."""
     
@@ -379,6 +391,98 @@ class DocxRenderer(mistune.BaseRenderer):
             left=horizontal_margin,
             right=horizontal_margin,
         )
+
+    def _resolve_table_layout(self, table_style: Dict[str, Any]) -> str:
+        """Return a supported layout, preserving the historic default."""
+        layout = str(
+            table_style.get("layout", TABLE_LAYOUT_ACCENT_GRID)
+        ).strip().lower()
+        if layout not in TABLE_LAYOUTS:
+            return TABLE_LAYOUT_ACCENT_GRID
+        return layout
+
+    def _set_ooxml_borders(
+        self,
+        properties: Any,
+        container_tag: str,
+        borders: Dict[str, Tuple[str, Optional[int]]],
+    ) -> None:
+        """Set deterministic black borders on table or cell properties."""
+        container = properties.first_child_found_in(container_tag)
+        if container is None:
+            container = OxmlElement(container_tag)
+            properties.append(container)
+
+        for side, (value, size) in borders.items():
+            border = container.find(qn(f"w:{side}"))
+            if border is None:
+                border = OxmlElement(f"w:{side}")
+                container.append(border)
+            border.set(qn("w:val"), value)
+            if value == "single" and size is not None:
+                border.set(qn("w:sz"), str(size))
+                border.set(qn("w:color"), "000000")
+            else:
+                border.attrib.pop(qn("w:sz"), None)
+                border.attrib.pop(qn("w:color"), None)
+
+    def _apply_table_layout(
+        self,
+        table: Any,
+        table_style: Dict[str, Any],
+        layout: str,
+    ) -> None:
+        """Apply only the visual properties owned by a table preset."""
+        if layout == TABLE_LAYOUT_ACCENT_GRID:
+            style_name = table_style.get("style")
+            if style_name:
+                try:
+                    table.style = style_name
+                except KeyError:
+                    pass
+            return
+
+        table_properties = table._tbl.tblPr
+        table_style_element = table_properties.find(qn("w:tblStyle"))
+        if table_style_element is not None:
+            table_properties.remove(table_style_element)
+
+        if layout == TABLE_LAYOUT_PLAIN_GRID:
+            self._set_ooxml_borders(
+                table_properties,
+                "w:tblBorders",
+                {
+                    side: ("single", 4)
+                    for side in (
+                        "top",
+                        "left",
+                        "bottom",
+                        "right",
+                        "insideH",
+                        "insideV",
+                    )
+                },
+            )
+            return
+
+        self._set_ooxml_borders(
+            table_properties,
+            "w:tblBorders",
+            {
+                "top": ("single", 12),
+                "left": ("nil", None),
+                "bottom": ("single", 12),
+                "right": ("nil", None),
+                "insideH": ("nil", None),
+                "insideV": ("nil", None),
+            },
+        )
+        for cell in table.rows[0].cells:
+            self._set_ooxml_borders(
+                cell._tc.get_or_add_tcPr(),
+                "w:tcBorders",
+                {"bottom": ("single", 6)},
+            )
 
     def _set_row_repeats_as_table_header(self, row: Any) -> None:
         """Mark a table row to repeat as the header row on each Word page."""
@@ -1698,6 +1802,7 @@ class DocxRenderer(mistune.BaseRenderer):
         """
         # Get table style
         table_style = self.styles.get_table_style()
+        table_layout = self._resolve_table_layout(table_style)
         
         # Create table - we'll determine column count from header
         children = token.get('children', [])
@@ -1734,13 +1839,7 @@ class DocxRenderer(mistune.BaseRenderer):
         )
         self._set_table_column_widths(table, column_widths)
         
-        # Apply table style if specified
-        if 'style' in table_style and table_style['style']:
-            try:
-                table.style = table_style['style']
-            except KeyError:
-                # Style doesn't exist, use default
-                pass
+        self._apply_table_layout(table, table_style, table_layout)
         
         # Track current row index
         self._current_table = table
@@ -1763,6 +1862,7 @@ class DocxRenderer(mistune.BaseRenderer):
         """Render table header."""
         cells = token.get('children', [])
         table_style = self.styles.get_table_style()
+        table_layout = self._resolve_table_layout(table_style)
         header_alignment = str(table_style.get('header_alignment', 'center')).lower()
         header_vertical_alignment = str(table_style.get('header_vertical_alignment', 'center')).lower()
         
@@ -1806,7 +1906,10 @@ class DocxRenderer(mistune.BaseRenderer):
                     run.font.bold = True
                 
                 # Apply header background if specified
-                if 'header_background' in table_style:
+                if (
+                    table_layout != TABLE_LAYOUT_THREE_LINE
+                    and 'header_background' in table_style
+                ):
                     try:
                         from docx.oxml.ns import nsdecls
                         from docx.oxml import parse_xml
@@ -1835,6 +1938,7 @@ class DocxRenderer(mistune.BaseRenderer):
         """Render table row."""
         cells = token.get('children', [])
         table_style = self.styles.get_table_style()
+        table_layout = self._resolve_table_layout(table_style)
         
         if not self._current_table or self._current_row_idx >= len(self._current_table.rows):
             return ''
@@ -1842,7 +1946,10 @@ class DocxRenderer(mistune.BaseRenderer):
         row = self._current_table.rows[self._current_row_idx]
         
         # Check if alternating rows are enabled
-        alternating_rows = table_style.get('alternating_rows', False)
+        alternating_rows = (
+            table_layout == TABLE_LAYOUT_ACCENT_GRID
+            and table_style.get('alternating_rows', False)
+        )
         
         for col_idx, cell_token in enumerate(cells):
             if col_idx < len(row.cells):
