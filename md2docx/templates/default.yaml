@@ -108,6 +108,7 @@ code_block:
 
 # Table style
 table:
+  layout: accent_grid  # accent_grid=主题网格表；three_line=三线表；plain_grid=简洁网格表
   style: "Light Grid Accent 1"
   font_name: "仿宋"
   font_size: 12pt

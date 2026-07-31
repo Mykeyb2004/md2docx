@@ -20,6 +20,14 @@ def test_style_manager_loads_default_template():
     assert "paragraph" in manager.config
 
 
+def test_default_table_layout_is_accent_grid():
+    """Both fallback and packaged defaults should preserve the current table layout."""
+    packaged = StyleManager.load_packaged_template("default")
+
+    assert StyleManager.DEFAULT_CONFIG["table"]["layout"] == "accent_grid"
+    assert packaged["table"]["layout"] == "accent_grid"
+
+
 def test_get_heading_style():
     """Test getting heading styles for all levels."""
     manager = StyleManager()
