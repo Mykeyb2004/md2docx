@@ -231,6 +231,28 @@ def test_config_editor_rule_keeps_fixed_enums_readonly():
     assert table_rule.options == ("content-weighted", "balanced")
 
 
+def test_config_editor_rule_maps_table_layout_presets_to_stable_values():
+    """Table layout should show Chinese presets while retaining YAML-safe values."""
+    rule = gui_module.resolve_field_widget_rule(("table", "layout"))
+
+    assert rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert rule.readonly is True
+    assert rule.options == ("主题网格表（当前默认）", "三线表", "简洁网格表")
+    assert rule.value_mapping == (
+        ("主题网格表（当前默认）", "accent_grid"),
+        ("三线表", "three_line"),
+        ("简洁网格表", "plain_grid"),
+    )
+
+
+def test_config_editor_resolves_table_layout_label():
+    """The table tab should use a clear label for the layout preset field."""
+    assert (
+        gui_module.resolve_field_label(("table", "layout"), "layout", "accent_grid")
+        == "表格样式"
+    )
+
+
 def test_config_editor_rule_keeps_common_sizes_editable():
     """Sizes, spacing, and numeric values should remain editable suggestions."""
     margin_rule = gui_module.resolve_field_widget_rule(("document", "margin_top"))
@@ -389,6 +411,37 @@ def test_config_editor_create_field_widget_dispatches_enhanced_controls(monkeypa
 
     assert entry.widget_type == "entry"
     assert len(editor.field_bindings) == 5
+
+
+def test_config_editor_table_layout_widget_displays_and_saves_mapped_values(monkeypatch):
+    """Table style presets should display Chinese labels and save stable YAML values."""
+    def make_widget(widget_type):
+        def factory(*args, **kwargs):
+            return _FakeWidget(widget_type, *args, **kwargs)
+
+        return factory
+
+    monkeypatch.setattr(gui_module.tk, "StringVar", _FakeStringVar)
+    monkeypatch.setattr(gui_module.ttk, "Combobox", make_widget("combobox"))
+
+    editor = gui_module.ConfigEditorWindow.__new__(gui_module.ConfigEditorWindow)
+    editor.field_bindings = []
+    editor.current_config = {"table": {"layout": "accent_grid"}}
+
+    widget = editor.create_field_widget(
+        object(),
+        ("table", "layout"),
+        "accent_grid",
+        "accent_grid",
+    )
+
+    assert widget.widget_type == "combobox"
+    assert widget.kwargs["textvariable"].get() == "主题网格表（当前默认）"
+    assert widget.kwargs["values"] == ("主题网格表（当前默认）", "三线表", "简洁网格表")
+
+    editor.field_bindings[0].variable.set("三线表")
+
+    assert editor.collect_config()["table"]["layout"] == "three_line"
 
 
 def test_config_editor_color_field_widget_wires_preview_entry_and_button(monkeypatch):
