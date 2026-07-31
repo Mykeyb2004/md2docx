@@ -39,6 +39,7 @@ class FieldWidgetRule:
     kind: str = FIELD_WIDGET_ENTRY
     options: Tuple[str, ...] = ()
     readonly: bool = False
+    value_mapping: Tuple[Tuple[str, str], ...] = ()
 
 
 DEFAULT_FIELD_WIDGET_RULE = FieldWidgetRule()
@@ -91,6 +92,15 @@ VERTICAL_ALIGNMENT_OPTIONS = ("top", "center", "bottom")
 HEADER_ALIGNMENT_OPTIONS = ("left", "center", "right", "justify", "inherit")
 LIST_BULLET_OPTIONS = ("•", "-", "*", "·", "○", "▪")
 NUMBER_FORMAT_OPTIONS = ("1.", "1)", "(1)")
+TABLE_LAYOUT_VALUE_MAPPING = (
+    ("主题网格表（当前默认）", "accent_grid"),
+    ("三线表", "three_line"),
+    ("简洁网格表", "plain_grid"),
+)
+
+READONLY_FIELD_VALUE_MAPPINGS: Dict[ConfigPath, Tuple[Tuple[str, str], ...]] = {
+    ("table", "layout"): TABLE_LAYOUT_VALUE_MAPPING,
+}
 
 READONLY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
     ("document", "page_size"): ("A4", "A3", "Letter"),
@@ -130,6 +140,10 @@ LEGACY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
 # Legacy public mapping for callers that inspect the previous fixed enum options.
 # The enhanced editor uses resolve_field_widget_rule() for richer widget metadata.
 FIELD_OPTIONS = LEGACY_FIELD_OPTIONS
+
+FIELD_LABELS: Dict[ConfigPath, str] = {
+    ("table", "layout"): "表格样式",
+}
 
 COLOR_FIELD_PATHS = {
     *((section, "font_color") for section in STYLE_SECTIONS),
@@ -220,6 +234,15 @@ def resolve_field_widget_rule(path: ConfigPath) -> FieldWidgetRule:
     if not path:
         return DEFAULT_FIELD_WIDGET_RULE
 
+    readonly_value_mapping = READONLY_FIELD_VALUE_MAPPINGS.get(path)
+    if readonly_value_mapping is not None:
+        return FieldWidgetRule(
+            kind=FIELD_WIDGET_COMBOBOX,
+            options=tuple(display for display, _stored in readonly_value_mapping),
+            readonly=True,
+            value_mapping=readonly_value_mapping,
+        )
+
     readonly_options = READONLY_FIELD_OPTIONS.get(path)
     if readonly_options is not None:
         return FieldWidgetRule(
@@ -269,6 +292,28 @@ def resolve_field_widget_rule(path: ConfigPath) -> FieldWidgetRule:
     return DEFAULT_FIELD_WIDGET_RULE
 
 
+def format_mapped_widget_value(raw_value: Any, value_mapping: Tuple[Tuple[str, str], ...]) -> str:
+    """Return the display label for a stored mapped widget value."""
+    text_value = format_config_value(raw_value)
+    for display_value, stored_value in value_mapping:
+        if text_value == stored_value:
+            return display_value
+    return text_value
+
+
+def parse_mapped_widget_value(raw_value: Any, value_mapping: Tuple[Tuple[str, str], ...]) -> Any:
+    """Return the stored value for a mapped widget display label."""
+    for display_value, stored_value in value_mapping:
+        if raw_value == display_value:
+            return stored_value
+    return raw_value
+
+
+def resolve_field_label(path: ConfigPath, field_name: str, _value: Any) -> str:
+    """Return the display label for one editor field."""
+    return FIELD_LABELS.get(path, field_name)
+
+
 def normalize_color_preview(raw_value: Any) -> Optional[str]:
     """Normalize a hex color for preview, returning None for unsupported text."""
     text = str(raw_value or "").strip()
@@ -309,6 +354,7 @@ class FieldBinding:
     path: ConfigPath
     variable: Any
     schema_value: Any
+    value_mapping: Tuple[Tuple[str, str], ...] = ()
 
 
 class ConfigEditorWindow:
@@ -565,9 +611,9 @@ class ConfigEditorWindow:
                 row.grid(row=index, column=0, sticky=(tk.W, tk.E), pady=4)
                 row.columnconfigure(1, weight=1)
 
-                label_text = key
+                label_text = resolve_field_label(child_path, key, value)
                 if child_schema is None:
-                    label_text = f"{key} (留空 = null)"
+                    label_text = f"{label_text} (留空 = null)"
 
                 ttk.Label(row, text=label_text, width=32).grid(row=0, column=0, sticky=tk.W, padx=(0, 8))
 
@@ -579,7 +625,8 @@ class ConfigEditorWindow:
         row.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=4)
         row.columnconfigure(1, weight=1)
 
-        ttk.Label(row, text=path[-1], width=32).grid(row=0, column=0, sticky=tk.W, padx=(0, 8))
+        label_text = resolve_field_label(path, path[-1], data)
+        ttk.Label(row, text=label_text, width=32).grid(row=0, column=0, sticky=tk.W, padx=(0, 8))
         widget = self.create_field_widget(row, path, data, schema)
         widget.grid(row=0, column=1, sticky=(tk.W, tk.E))
 
@@ -649,8 +696,11 @@ class ConfigEditorWindow:
             self.field_bindings.append(FieldBinding(path=path, variable=variable, schema_value=expected_value))
             return widget
 
-        variable = tk.StringVar(value=format_config_value(value))
         rule = resolve_field_widget_rule(path)
+        display_value = format_config_value(value)
+        if rule.value_mapping:
+            display_value = format_mapped_widget_value(value, rule.value_mapping)
+        variable = tk.StringVar(value=display_value)
 
         if rule.kind == FIELD_WIDGET_COLOR:
             widget = self.create_color_field_widget(parent, variable)
@@ -664,7 +714,14 @@ class ConfigEditorWindow:
         else:
             widget = ttk.Entry(parent, textvariable=variable)
 
-        self.field_bindings.append(FieldBinding(path=path, variable=variable, schema_value=schema_value))
+        self.field_bindings.append(
+            FieldBinding(
+                path=path,
+                variable=variable,
+                schema_value=schema_value,
+                value_mapping=rule.value_mapping,
+            )
+        )
         return widget
 
     def collect_config(self) -> Dict[str, Any]:
@@ -673,6 +730,7 @@ class ConfigEditorWindow:
 
         for binding in self.field_bindings:
             raw_value = binding.variable.get()
+            raw_value = parse_mapped_widget_value(raw_value, binding.value_mapping)
             try:
                 value = coerce_config_value(raw_value, binding.schema_value)
             except ValueError as exc:
