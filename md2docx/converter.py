@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 
 from docx import Document
 
-from md2docx.config_utils import merge_config
+from md2docx.config_utils import clone_config, merge_config
 from md2docx.styles import StyleManager
 from md2docx.parser import MarkdownParser
 
@@ -30,6 +30,7 @@ class Converter:
         template: Optional[str] = None,
         style_config: Optional[str] = None,
         config_override: Optional[Dict[str, Any]] = None,
+        config_data: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Initialize converter.
@@ -38,14 +39,19 @@ class Converter:
             template: Name of predefined style template
             style_config: Path to custom YAML style configuration
             config_override: Runtime config overrides merged over the loaded style config
+            config_data: Complete in-memory style config that bypasses disk defaults
         """
         self.template = template
         self.style_config = style_config
         self.config_override = config_override or {}
+        self.config_data = clone_config(config_data) if config_data is not None else None
         
         # Initialize style manager
         config_path = style_config or template
-        self.style_manager = StyleManager(config_path)
+        if self.config_data is None:
+            self.style_manager = StyleManager(config_path)
+        else:
+            self.style_manager = StyleManager.from_config(self.config_data)
         if self.config_override:
             self.style_manager.config = merge_config(
                 self.style_manager.config,

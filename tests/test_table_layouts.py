@@ -1,6 +1,8 @@
 """Tests for selectable DOCX table layout presets."""
 from pathlib import Path
 
+import pytest
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml.ns import qn
 
 from md2docx import Converter
@@ -47,6 +49,26 @@ def _border_attributes(border):
 def _cell_shading(cell):
     shading = cell._tc.tcPr.find(qn("w:shd"))
     return None if shading is None else shading.get(qn("w:fill"))
+
+
+def _paragraph_spacing(paragraph, side):
+    p_pr = paragraph._p.pPr
+    assert p_pr is not None
+    spacing = p_pr.find(qn("w:spacing"))
+    assert spacing is not None
+    return spacing.get(qn(f"w:{side}"))
+
+
+@pytest.mark.parametrize("layout", ("accent_grid", "plain_grid", "three_line"))
+def test_all_table_layouts_center_cell_text_by_default(layout):
+    table = _render_table(layout)
+
+    for row in table.rows:
+        for cell in row.cells:
+            paragraph = cell.paragraphs[0]
+            assert cell.vertical_alignment == WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            assert _paragraph_spacing(paragraph, "before") == "0"
+            assert _paragraph_spacing(paragraph, "after") == "0"
 
 
 def test_missing_and_invalid_layout_preserve_theme_grid():

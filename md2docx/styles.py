@@ -111,6 +111,14 @@ class StyleManager:
             # Load default template
             self.config = self._load_default_template()
 
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> "StyleManager":
+        """Create a manager from an isolated in-memory configuration."""
+        manager = cls.__new__(cls)
+        manager.config_path = None
+        manager.config = copy.deepcopy(config)
+        return manager
+
     @staticmethod
     def _get_runtime_dir() -> Path:
         """Return the directory users are expected to place editable config files in."""

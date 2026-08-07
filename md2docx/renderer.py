@@ -392,6 +392,17 @@ class DocxRenderer(mistune.BaseRenderer):
             right=horizontal_margin,
         )
 
+    def _apply_table_paragraph_spacing(
+        self,
+        paragraph: Any,
+        table_style: Dict[str, Any],
+    ) -> None:
+        """Apply deterministic spacing to text inside table cells."""
+        if 'line_spacing' in table_style:
+            paragraph.paragraph_format.line_spacing = table_style['line_spacing']
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(0)
+
     def _resolve_table_layout(self, table_style: Dict[str, Any]) -> str:
         """Return a supported layout, preserving the historic default."""
         layout = str(
@@ -1888,9 +1899,7 @@ class DocxRenderer(mistune.BaseRenderer):
                 }
                 self._add_formatted_text(p, text, base_style)
                 
-                # Apply line spacing to table cell paragraph
-                if 'line_spacing' in table_style:
-                    p.paragraph_format.line_spacing = table_style['line_spacing']
+                self._apply_table_paragraph_spacing(p, table_style)
                 
                 # Center header text by default, with an opt-in inherit mode.
                 align = cell_token.get('attrs', {}).get('align') or table_style.get('alignment', 'left')
@@ -1967,8 +1976,7 @@ class DocxRenderer(mistune.BaseRenderer):
                 }
                 self._add_formatted_text(p, text, base_style)
 
-                if 'line_spacing' in table_style:
-                    p.paragraph_format.line_spacing = table_style['line_spacing']
+                self._apply_table_paragraph_spacing(p, table_style)
                 
                 # Apply column alignment, falling back to the configured table default.
                 align = cell_token.get('attrs', {}).get('align') or table_style.get('alignment', 'left')

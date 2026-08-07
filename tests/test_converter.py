@@ -24,3 +24,26 @@ def test_converter_with_style_config():
     converter = Converter(template="default")
     assert converter.style_config is None
     assert converter.template == "default"
+
+
+def test_converter_with_config_data_ignores_runtime_default(
+    tmp_path,
+    monkeypatch,
+):
+    """An in-memory effective config must not inherit a legacy default.yaml."""
+    (tmp_path / "default.yaml").write_text(
+        "document:\n"
+        "  page_size: Letter\n"
+        "legacy_only:\n"
+        "  enabled: true\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    config_data = {"document": {"page_size": "A4"}}
+
+    converter = Converter(config_data=config_data)
+    config_data["document"]["page_size"] = "A3"
+
+    assert converter.style_manager.config == {
+        "document": {"page_size": "A4"},
+    }

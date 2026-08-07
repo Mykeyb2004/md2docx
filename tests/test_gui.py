@@ -3,8 +3,11 @@ Tests for GUI runtime conversion options.
 """
 import json
 from pathlib import Path
+from unittest.mock import Mock
 
 import md2docx.gui as gui_module
+from md2docx.config_document import ConfigDocument
+from md2docx.config_utils import load_yaml_config
 from md2docx.gui import Md2docxGUI
 
 
@@ -16,6 +19,9 @@ class _FakeBooleanVar:
 
     def get(self) -> bool:
         return self.value
+
+    def set(self, value: bool) -> None:
+        self.value = value
 
 
 class _FakeStringVar:
@@ -73,57 +79,73 @@ class _ImmediateRoot:
             callback()
 
 
-def test_gui_builds_runtime_override_for_auto_fix_tables():
-    """Main GUI toggle should feed the table auto-fix override into conversions."""
-    gui = Md2docxGUI.__new__(Md2docxGUI)
-    gui.auto_fix_tables_var = _FakeBooleanVar(True)
-
-    assert gui.build_runtime_config_override() == {
-        "document": {"auto_fix_tables": True}
-    }
-
-
 def test_gui_defaults_to_packaged_template_when_no_config_preference(tmp_path: Path):
-    """Missing preferences should fall back to the bundled default.yaml."""
+    """Missing preferences should use built-in defaults without inventing a file."""
     gui = Md2docxGUI.__new__(Md2docxGUI)
     gui.preferences_file = tmp_path / "preferences.json"
-    gui.packaged_default_config_path = tmp_path / "templates" / "default.yaml"
+    gui.packaged_default_config = {"document": {"page_size": "A4"}}
 
-    assert gui.load_selected_config_path() == gui.packaged_default_config_path
+    document, error = gui.load_initial_config_document()
+
+    assert document.current_path is None
+    assert document.saved_config == {"document": {"page_size": "A4"}}
+    assert error is None
 
 
-def test_gui_persists_selected_config_path(tmp_path: Path):
-    """The selected conversion config should survive across app starts."""
+def test_gui_persists_and_loads_last_config_path(tmp_path: Path):
+    """The last successfully used config should survive across app starts."""
     selected_config = tmp_path / "custom.yaml"
     selected_config.write_text("document:\n  auto_fix_tables: true\n", encoding="utf-8")
 
     gui = Md2docxGUI.__new__(Md2docxGUI)
     gui.preferences_file = tmp_path / "preferences.json"
-    gui.packaged_default_config_path = tmp_path / "templates" / "default.yaml"
+    gui.packaged_default_config = {"document": {"auto_fix_tables": False}}
 
-    gui.save_selected_config_path(selected_config)
+    assert gui.save_last_config_path(selected_config) is True
+    document, error = gui.load_initial_config_document()
 
     assert json.loads(gui.preferences_file.read_text(encoding="utf-8")) == {
-        "config_file": str(selected_config)
+        "last_config_path": str(selected_config)
     }
-    assert gui.load_selected_config_path() == selected_config
+    assert document.current_path == selected_config
+    assert document.saved_config["document"]["auto_fix_tables"] is True
+    assert error is None
 
 
-def test_gui_ignores_missing_saved_config_path(tmp_path: Path):
-    """A stale preference should not break startup or conversion."""
-    missing_config = tmp_path / "missing.yaml"
-    packaged_default = tmp_path / "templates" / "default.yaml"
+def test_gui_loads_legacy_config_file_preference(tmp_path: Path):
+    """Existing installations should migrate the former preference key."""
+    selected_config = tmp_path / "legacy.yaml"
+    selected_config.write_text("table:\n  layout: three_line\n", encoding="utf-8")
     preferences_file = tmp_path / "preferences.json"
     preferences_file.write_text(
-        json.dumps({"config_file": str(missing_config)}),
+        json.dumps({"config_file": str(selected_config)}),
         encoding="utf-8",
     )
 
     gui = Md2docxGUI.__new__(Md2docxGUI)
     gui.preferences_file = preferences_file
-    gui.packaged_default_config_path = packaged_default
 
-    assert gui.load_selected_config_path() == packaged_default
+    assert gui.load_last_config_path() == selected_config
+
+
+def test_gui_missing_last_config_reports_error_and_uses_defaults(tmp_path: Path):
+    """A stale preference should produce a warning payload and a usable document."""
+    missing_config = tmp_path / "missing.yaml"
+    preferences_file = tmp_path / "preferences.json"
+    preferences_file.write_text(
+        json.dumps({"last_config_path": str(missing_config)}),
+        encoding="utf-8",
+    )
+
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = preferences_file
+    gui.packaged_default_config = {"document": {"page_size": "A4"}}
+
+    document, error = gui.load_initial_config_document()
+
+    assert document.current_path is None
+    assert document.saved_config["document"]["page_size"] == "A4"
+    assert str(missing_config) in error
 
 
 def test_gui_browse_config_file_saves_selection(tmp_path: Path, monkeypatch):
@@ -139,53 +161,135 @@ def test_gui_browse_config_file_saves_selection(tmp_path: Path, monkeypatch):
 
     gui = Md2docxGUI.__new__(Md2docxGUI)
     gui.preferences_file = tmp_path / "preferences.json"
-    gui.packaged_default_config_path = tmp_path / "templates" / "default.yaml"
-    gui.config_file_var = _FakeStringVar()
-    gui.auto_fix_tables_var = _FakeStringVar()
+    gui.packaged_default_config = {"document": {"auto_fix_tables": False}}
+    gui.config_document = ConfigDocument.from_defaults(gui.packaged_default_config)
+    gui.config_file_var = _FakeStringVar("内置默认（未关联文件）")
     gui.status_var = _FakeStringVar()
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
 
     gui.browse_config_file()
 
     assert gui.config_file_var.get() == str(selected_config)
     assert json.loads(gui.preferences_file.read_text(encoding="utf-8")) == {
-        "config_file": str(selected_config)
+        "last_config_path": str(selected_config)
     }
-    assert gui.auto_fix_tables_var.get() is True
-    assert gui.status_var.get() == f"Config selected: {selected_config}"
+    assert gui.config_document.current_path == selected_config
+    assert gui.config_document.saved_config["document"]["auto_fix_tables"] is True
+    assert gui.status_var.get() == f"已打开配置：{selected_config}"
 
 
-def test_gui_conversion_uses_selected_config_file(tmp_path: Path, monkeypatch):
-    """Conversions should instantiate Converter with the config selected in the GUI."""
+def test_gui_invalid_browse_keeps_document_and_preference(tmp_path: Path, monkeypatch):
+    """A failed open must not replace the current document or remembered path."""
     selected_config = tmp_path / "selected.yaml"
-    selected_config.write_text("paragraph:\n  font_name: ConfigFont\n", encoding="utf-8")
+    selected_config.write_text("table:\n  layout: accent_grid\n", encoding="utf-8")
+    invalid_config = tmp_path / "invalid.yaml"
+    invalid_config.write_text("- not-a-mapping\n", encoding="utf-8")
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = tmp_path / "preferences.json"
+    gui.packaged_default_config = {"table": {"layout": "accent_grid"}}
+    gui.config_document = ConfigDocument.load(selected_config, gui.packaged_default_config)
+    gui.config_file_var = _FakeStringVar(str(selected_config))
+    gui.status_var = _FakeStringVar()
+    gui.save_last_config_path(selected_config)
+    original_document = gui.config_document
+    original_preferences = gui.preferences_file.read_text(encoding="utf-8")
+    errors = []
+    monkeypatch.setattr(
+        gui_module.filedialog,
+        "askopenfilename",
+        lambda **_kwargs: str(invalid_config),
+    )
+    monkeypatch.setattr(
+        gui_module.messagebox,
+        "showerror",
+        lambda title, message, **_kwargs: errors.append((title, message)),
+    )
+
+    gui.browse_config_file()
+
+    assert gui.config_document is original_document
+    assert gui.config_file_var.get() == str(selected_config)
+    assert gui.preferences_file.read_text(encoding="utf-8") == original_preferences
+    assert errors and errors[0][0] == "配置读取失败"
+
+
+def test_gui_conversion_uses_saved_config_not_dirty_draft(monkeypatch):
+    """Conversions must ignore unsaved editor values."""
     captured = {}
 
     class FakeConverter:
-        def __init__(self, *, style_config=None, config_override=None):
+        def __init__(
+            self,
+            *,
+            style_config=None,
+            config_override=None,
+            config_data=None,
+        ):
             captured["style_config"] = style_config
             captured["config_override"] = config_override
+            captured["config_data"] = config_data
 
         def convert(self, input_file, output_file):
             captured["convert"] = (input_file, output_file)
 
     monkeypatch.setattr(gui_module, "Converter", FakeConverter)
     monkeypatch.setattr(gui_module.messagebox, "showinfo", lambda *args, **kwargs: None)
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
 
     gui = Md2docxGUI.__new__(Md2docxGUI)
     gui.root = _ImmediateRoot()
     gui.progress = _FakeProgress()
     gui.status_var = _FakeStringVar()
-    gui.config_file_var = _FakeStringVar(str(selected_config))
-    gui.auto_fix_tables_var = _FakeBooleanVar(False)
+    gui.config_document = ConfigDocument.from_defaults(
+        {
+            "document": {"auto_fix_tables": True},
+            "table": {"layout": "accent_grid"},
+        }
+    )
+    gui.config_document.update_draft(
+        {
+            "document": {"auto_fix_tables": False},
+            "table": {"layout": "three_line"},
+        }
+    )
     gui.history = []
     gui.add_to_history = lambda *args: None
     gui.refresh_history_list = lambda: None
 
     gui._do_conversion("input.md", "output.docx")
 
-    assert captured["style_config"] == str(selected_config)
-    assert captured["config_override"] == {"document": {"auto_fix_tables": False}}
+    assert captured["style_config"] is None
+    assert captured["config_override"] is None
+    assert captured["config_data"]["table"]["layout"] == "accent_grid"
+    assert captured["config_data"]["document"]["auto_fix_tables"] is True
     assert captured["convert"] == ("input.md", "output.docx")
+
+
+def test_gui_close_preserves_root_when_editor_close_is_cancelled():
+    """Closing the app must honor a config editor's cancel decision."""
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.root = Mock()
+    editor_window = Mock()
+    editor_window.winfo_exists.return_value = True
+    gui.config_editor = Mock(window=editor_window)
+
+    gui.close()
+
+    gui.config_editor.close.assert_called_once_with()
+    gui.root.destroy.assert_not_called()
+
+
+def test_gui_build_effective_config_returns_an_independent_saved_snapshot():
+    """Building conversion data should neither expose nor update GUI state."""
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.config_document = ConfigDocument.from_defaults(
+        {"document": {"auto_fix_tables": True}}
+    )
+
+    effective_config = gui.build_effective_conversion_config()
+    effective_config["document"]["auto_fix_tables"] = False
+
+    assert gui.config_document.saved_config["document"]["auto_fix_tables"] is True
 
 
 def test_config_editor_rule_uses_editable_combobox_for_font_fields():
@@ -442,6 +546,306 @@ def test_config_editor_table_layout_widget_displays_and_saves_mapped_values(monk
     editor.field_bindings[0].variable.set("三线表")
 
     assert editor.collect_config()["table"]["layout"] == "three_line"
+
+
+def _make_config_editor(document: ConfigDocument):
+    """Build a non-Tk editor shell for document workflow tests."""
+    editor = gui_module.ConfigEditorWindow.__new__(gui_module.ConfigEditorWindow)
+    editor.window = Mock()
+    editor.status_var = _FakeStringVar()
+    editor.source_var = _FakeStringVar()
+    editor.document = document
+    editor.packaged_default_config = {"table": {"layout": "accent_grid"}}
+    editor.current_config = document.draft_config
+    editor.on_saved = None
+    return editor
+
+
+def test_unsaved_changes_dialog_uses_save_discard_cancel_choices(monkeypatch):
+    """The dirty-close prompt should expose explicit user actions."""
+    captured = {}
+
+    def choose(**kwargs):
+        captured.update(kwargs)
+        return "discard"
+
+    monkeypatch.setattr(gui_module, "ask_three_way_choice", choose, raising=False)
+
+    result = gui_module.ask_unsaved_changes(parent=object(), path=Path("config.yaml"))
+
+    assert result == "discard"
+    assert captured["choices"] == (
+        ("save", "保存"),
+        ("discard", "放弃"),
+        ("cancel", "取消"),
+    )
+
+
+def test_external_change_dialog_uses_reload_overwrite_cancel_choices(monkeypatch):
+    """The conflict prompt should make overwrite an explicit decision."""
+    captured = {}
+
+    def choose(**kwargs):
+        captured.update(kwargs)
+        return "reload"
+
+    monkeypatch.setattr(gui_module, "ask_three_way_choice", choose, raising=False)
+
+    result = gui_module.ask_external_change(parent=object(), path=Path("config.yaml"))
+
+    assert result == "reload"
+    assert captured["choices"] == (
+        ("reload", "重新载入"),
+        ("overwrite", "覆盖"),
+        ("cancel", "取消"),
+    )
+
+
+def test_config_editor_save_as_switches_current_file(tmp_path: Path, monkeypatch):
+    """Save As should switch the document only after writing the selected file."""
+    target = tmp_path / "saved.yaml"
+    document = ConfigDocument.from_defaults({"table": {"layout": "accent_grid"}})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: {"table": {"layout": "three_line"}}
+    saved_paths = []
+    editor.on_saved = saved_paths.append
+    monkeypatch.setattr(
+        gui_module.filedialog,
+        "asksaveasfilename",
+        lambda **_kwargs: str(target),
+    )
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
+
+    assert editor.save_config_as() is True
+
+    assert document.current_path == target
+    assert document.saved_config["table"]["layout"] == "three_line"
+    assert document.dirty is False
+    assert saved_paths == [target]
+    assert editor.source_var.get() == str(target)
+
+
+def test_config_editor_save_as_current_path_uses_external_change_dialog(
+    tmp_path: Path,
+    monkeypatch,
+):
+    """Selecting the current file in Save As must retain conflict choices."""
+    path = tmp_path / "selected.yaml"
+    path.write_text("table:\n  layout: accent_grid\n", encoding="utf-8")
+    document = ConfigDocument.load(path, {})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: {"table": {"layout": "three_line"}}
+    path.write_text("table:\n  layout: plain_grid\n", encoding="utf-8")
+    choices = []
+    monkeypatch.setattr(
+        gui_module.filedialog,
+        "asksaveasfilename",
+        lambda **_kwargs: str(path),
+    )
+    monkeypatch.setattr(
+        gui_module,
+        "ask_external_change",
+        lambda **kwargs: choices.append(kwargs["path"]) or "cancel",
+        raising=False,
+    )
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
+
+    assert editor.save_config_as() is False
+
+    assert choices == [path]
+    assert load_yaml_config(path)["table"]["layout"] == "plain_grid"
+    assert document.draft_config["table"]["layout"] == "three_line"
+    assert document.dirty is True
+
+
+def test_config_editor_save_overwrites_current_file(tmp_path: Path, monkeypatch):
+    """Save should write the draft without changing the associated file."""
+    path = tmp_path / "selected.yaml"
+    path.write_text("table:\n  layout: accent_grid\n", encoding="utf-8")
+    document = ConfigDocument.load(path, {})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: {"table": {"layout": "three_line"}}
+    saved_paths = []
+    editor.on_saved = saved_paths.append
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
+
+    assert editor.save_config() is True
+
+    assert document.current_path == path
+    assert document.saved_config["table"]["layout"] == "three_line"
+    assert load_yaml_config(path)["table"]["layout"] == "three_line"
+    assert document.dirty is False
+    assert saved_paths == [path]
+
+
+def test_config_editor_restore_defaults_only_changes_draft(tmp_path: Path, monkeypatch):
+    """Restoring built-in defaults should require a later save to affect conversion."""
+    path = tmp_path / "selected.yaml"
+    path.write_text("table:\n  layout: three_line\n", encoding="utf-8")
+    document = ConfigDocument.load(path, {"table": {"layout": "accent_grid"}})
+    editor = _make_config_editor(document)
+    editor.load_config_data = lambda config, source: setattr(editor, "current_config", config)
+    monkeypatch.setattr(gui_module.messagebox, "askyesno", lambda *args, **kwargs: True)
+
+    editor.restore_packaged_defaults()
+
+    assert document.saved_config["table"]["layout"] == "three_line"
+    assert document.draft_config["table"]["layout"] == "accent_grid"
+    assert document.dirty is True
+
+
+def test_config_editor_close_cancel_keeps_dirty_editor_open(monkeypatch):
+    """Cancel should preserve both the editor window and unsaved draft."""
+    document = ConfigDocument.from_defaults({"table": {"layout": "accent_grid"}})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: {"table": {"layout": "three_line"}}
+    monkeypatch.setattr(
+        gui_module,
+        "ask_unsaved_changes",
+        lambda **_kwargs: "cancel",
+        raising=False,
+    )
+
+    editor.close()
+
+    editor.window.destroy.assert_not_called()
+    assert document.draft_config["table"]["layout"] == "three_line"
+    assert document.dirty is True
+
+
+def test_config_editor_close_discard_resets_draft_and_closes(monkeypatch):
+    """Discard should restore the saved snapshot before closing the editor."""
+    document = ConfigDocument.from_defaults({"table": {"layout": "accent_grid"}})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: {"table": {"layout": "three_line"}}
+    monkeypatch.setattr(
+        gui_module,
+        "ask_unsaved_changes",
+        lambda **_kwargs: "discard",
+        raising=False,
+    )
+
+    editor.close()
+
+    assert document.draft_config == document.saved_config
+    assert document.dirty is False
+    editor.window.destroy.assert_called_once_with()
+
+
+def test_config_editor_close_save_commits_draft_and_closes(tmp_path: Path, monkeypatch):
+    """Save from the dirty-close prompt should commit before closing."""
+    path = tmp_path / "selected.yaml"
+    path.write_text("table:\n  layout: accent_grid\n", encoding="utf-8")
+    document = ConfigDocument.load(path, {})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: {"table": {"layout": "three_line"}}
+    monkeypatch.setattr(
+        gui_module,
+        "ask_unsaved_changes",
+        lambda **_kwargs: "save",
+        raising=False,
+    )
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
+
+    editor.close()
+
+    assert load_yaml_config(path)["table"]["layout"] == "three_line"
+    assert document.dirty is False
+    editor.window.grab_release.assert_called_once_with()
+    editor.window.destroy.assert_called_once_with()
+
+
+def test_config_editor_close_can_discard_invalid_form_values(monkeypatch):
+    """An invalid draft must still offer a way to abandon the editor."""
+    document = ConfigDocument.from_defaults({"table": {"layout": "accent_grid"}})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: (_ for _ in ()).throw(ValueError("bad value"))
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        gui_module,
+        "ask_unsaved_changes",
+        lambda **_kwargs: "discard",
+        raising=False,
+    )
+
+    editor.close()
+
+    assert document.draft_config == document.saved_config
+    assert document.dirty is False
+    editor.window.destroy.assert_called_once_with()
+
+
+def test_config_editor_external_change_can_overwrite(tmp_path: Path, monkeypatch):
+    """Explicit overwrite should save the current draft over an external edit."""
+    path = tmp_path / "selected.yaml"
+    path.write_text("table:\n  layout: accent_grid\n", encoding="utf-8")
+    document = ConfigDocument.load(path, {})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: {"table": {"layout": "three_line"}}
+    path.write_text("table:\n  layout: plain_grid\n", encoding="utf-8")
+    monkeypatch.setattr(
+        gui_module,
+        "ask_external_change",
+        lambda **_kwargs: "overwrite",
+        raising=False,
+    )
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
+
+    assert editor.save_config() is True
+
+    assert document.saved_config["table"]["layout"] == "three_line"
+    assert document.dirty is False
+
+
+def test_config_editor_external_change_can_reload(tmp_path: Path, monkeypatch):
+    """Reload should adopt the external version and discard the current draft."""
+    path = tmp_path / "selected.yaml"
+    path.write_text("table:\n  layout: accent_grid\n", encoding="utf-8")
+    document = ConfigDocument.load(path, {})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: {"table": {"layout": "three_line"}}
+    editor.load_config_data = lambda config, source: setattr(editor, "current_config", config)
+    path.write_text("table:\n  layout: plain_grid\n", encoding="utf-8")
+    monkeypatch.setattr(
+        gui_module,
+        "ask_external_change",
+        lambda **_kwargs: "reload",
+        raising=False,
+    )
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
+
+    assert editor.save_config() is False
+
+    assert document.saved_config["table"]["layout"] == "plain_grid"
+    assert document.draft_config == document.saved_config
+    assert document.dirty is False
+
+
+def test_config_editor_external_change_cancel_preserves_both_versions(
+    tmp_path: Path,
+    monkeypatch,
+):
+    """Cancel should keep the external file and the unsaved draft untouched."""
+    path = tmp_path / "selected.yaml"
+    path.write_text("table:\n  layout: accent_grid\n", encoding="utf-8")
+    document = ConfigDocument.load(path, {})
+    editor = _make_config_editor(document)
+    editor.collect_config = lambda: {"table": {"layout": "three_line"}}
+    path.write_text("table:\n  layout: plain_grid\n", encoding="utf-8")
+    monkeypatch.setattr(
+        gui_module,
+        "ask_external_change",
+        lambda **_kwargs: "cancel",
+        raising=False,
+    )
+    monkeypatch.setattr(gui_module.messagebox, "showerror", lambda *args, **kwargs: None)
+
+    assert editor.save_config() is False
+
+    assert load_yaml_config(path)["table"]["layout"] == "plain_grid"
+    assert document.saved_config["table"]["layout"] == "accent_grid"
+    assert document.draft_config["table"]["layout"] == "three_line"
+    assert document.dirty is True
 
 
 def test_config_editor_color_field_widget_wires_preview_entry_and_button(monkeypatch):
