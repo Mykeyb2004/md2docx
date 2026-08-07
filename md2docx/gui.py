@@ -1149,20 +1149,31 @@ class Md2docxGUI:
             text="编辑配置...",
             command=self.open_config_editor,
             width=12,
-        ).grid(row=2, column=3, padx=5)
+        ).grid(row=2, column=3, padx=5, sticky=(tk.W, tk.E))
 
         self.progress = ttk.Progressbar(conv_frame, mode="indeterminate", length=240)
-        self.progress.grid(row=3, column=0, pady=(15, 0), sticky=(tk.W, tk.E))
-
-        action_frame = ttk.Frame(conv_frame)
-        action_frame.grid(row=3, column=1, columnspan=3, pady=(15, 0), sticky=tk.E)
+        self.progress.grid(
+            row=3,
+            column=0,
+            columnspan=3,
+            padx=(0, 5),
+            pady=(15, 0),
+            sticky=(tk.W, tk.E),
+        )
 
         ttk.Button(
-            action_frame,
-            text="🔄 Convert to Word",
+            conv_frame,
+            text="转换格式",
             command=self.convert_file,
             style="Accent.TButton",
-        ).pack(side=tk.LEFT)
+            width=12,
+        ).grid(
+            row=3,
+            column=3,
+            padx=5,
+            pady=(15, 0),
+            sticky=(tk.W, tk.E),
+        )
 
     def setup_history_section(self, parent: ttk.Frame) -> None:
         """Setup history list display."""
