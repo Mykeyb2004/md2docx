@@ -333,19 +333,86 @@ def normalize_color_preview(raw_value: Any) -> Optional[str]:
     return None
 
 
-def center_window_on_screen(window: tk.Misc) -> None:
-    """Place a Tk window in the center of the current screen."""
+def _safe_winfo_int(widget: tk.Misc, method_name: str, default: int) -> int:
+    """Return an integer Tk geometry value, falling back for unmapped widgets."""
+    try:
+        value = getattr(widget, method_name)()
+    except (AttributeError, tk.TclError):
+        return default
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _window_dimension(widget: tk.Misc, actual_method: str, requested_method: str) -> int:
+    """Return a useful current or requested Tk window dimension."""
+    requested = _safe_winfo_int(widget, requested_method, 1)
+    actual = _safe_winfo_int(widget, actual_method, requested)
+    return max(actual if actual > 1 else requested, 1)
+
+
+def _format_geometry(width: int, height: int, x: int, y: int) -> str:
+    """Format Tk geometry with correct signs for positive and negative offsets."""
+    return f"{width}x{height}{x:+d}{y:+d}"
+
+
+def _clamp(value: int, lower: int, upper: int) -> int:
+    """Clamp a coordinate, tolerating windows larger than the available bounds."""
+    if upper < lower:
+        return lower
+    return min(max(value, lower), upper)
+
+
+def center_window_on_screen(window: tk.Misc, parent: Optional[tk.Misc] = None) -> None:
+    """Place a Tk window near its parent and keep it within visible desktop bounds."""
     window.update_idletasks()
+    if parent is not None:
+        parent.update_idletasks()
 
-    width = window.winfo_width() or window.winfo_reqwidth()
-    height = window.winfo_height() or window.winfo_reqheight()
-    screen_width = window.winfo_screenwidth()
-    screen_height = window.winfo_screenheight()
+    width = _window_dimension(window, "winfo_width", "winfo_reqwidth")
+    height = _window_dimension(window, "winfo_height", "winfo_reqheight")
 
-    x = max((screen_width - width) // 2, 0)
-    y = max((screen_height - height) // 2, 0)
+    anchor = parent if parent is not None else window
+    screen_width = _safe_winfo_int(anchor, "winfo_screenwidth", width)
+    screen_height = _safe_winfo_int(anchor, "winfo_screenheight", height)
+    vroot_x = _safe_winfo_int(anchor, "winfo_vrootx", 0)
+    vroot_y = _safe_winfo_int(anchor, "winfo_vrooty", 0)
+    vroot_width = _safe_winfo_int(anchor, "winfo_vrootwidth", screen_width)
+    vroot_height = _safe_winfo_int(anchor, "winfo_vrootheight", screen_height)
 
-    window.geometry(f"{width}x{height}+{x}+{y}")
+    if parent is None:
+        anchor_x = vroot_x
+        anchor_y = vroot_y
+        anchor_width = max(vroot_width, width)
+        anchor_height = max(vroot_height, height)
+    else:
+        anchor_x = _safe_winfo_int(parent, "winfo_rootx", vroot_x)
+        anchor_y = _safe_winfo_int(parent, "winfo_rooty", vroot_y)
+        anchor_width = _window_dimension(parent, "winfo_width", "winfo_reqwidth")
+        anchor_height = _window_dimension(parent, "winfo_height", "winfo_reqheight")
+
+    vroot_right = vroot_x + max(vroot_width, width)
+    vroot_bottom = vroot_y + max(vroot_height, height)
+    anchor_right = anchor_x + anchor_width
+    anchor_bottom = anchor_y + anchor_height
+
+    anchor_outside_reported_x = anchor_right <= vroot_x or anchor_x >= vroot_right
+    anchor_outside_reported_y = anchor_bottom <= vroot_y or anchor_y >= vroot_bottom
+    bounds_left = min(vroot_x, anchor_x) if anchor_outside_reported_x else vroot_x
+    bounds_right = max(vroot_right, anchor_right) if anchor_outside_reported_x else vroot_right
+    bounds_top = min(vroot_y, anchor_y) if anchor_outside_reported_y else vroot_y
+    bounds_bottom = (
+        max(vroot_bottom, anchor_bottom) if anchor_outside_reported_y else vroot_bottom
+    )
+
+    x = anchor_x + (anchor_width - width) // 2
+    y = anchor_y + (anchor_height - height) // 2
+    x = _clamp(x, bounds_left, bounds_right - width)
+    y = _clamp(y, bounds_top, bounds_bottom - height)
+
+    window.geometry(_format_geometry(width, height, x, y))
 
 
 def ask_three_way_choice(
@@ -388,7 +455,7 @@ def ask_three_way_choice(
 
     dialog.protocol("WM_DELETE_WINDOW", lambda: choose(cancel_value))
     dialog.grab_set()
-    dialog.after(0, lambda: center_window_on_screen(dialog))
+    dialog.after(0, lambda: center_window_on_screen(dialog, parent=parent))
     dialog.wait_window()
     return result["value"]
 
@@ -459,7 +526,7 @@ class ConfigEditorWindow:
 
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.window.grab_set()
-        self.window.after(0, lambda: center_window_on_screen(self.window))
+        self.window.after(0, lambda: center_window_on_screen(self.window, parent=root))
 
     def setup_ui(self) -> None:
         """Build the editor layout."""
@@ -1149,9 +1216,14 @@ class Md2docxGUI:
 
         self.history_tree.bind("<Double-1>", lambda event: self.reload_from_history())
 
+    def dialog_parent(self) -> Optional[tk.Misc]:
+        """Return the active owner for native dialogs when a root exists."""
+        return getattr(self, "root", None)
+
     def browse_input_file(self) -> None:
         """Open file dialog to select input Markdown file."""
         filename = filedialog.askopenfilename(
+            parent=self.dialog_parent(),
             title="Select Markdown File",
             filetypes=[
                 ("Markdown files", "*.md"),
@@ -1168,6 +1240,7 @@ class Md2docxGUI:
     def browse_output_file(self) -> None:
         """Open file dialog to select output Word file."""
         filename = filedialog.asksaveasfilename(
+            parent=self.dialog_parent(),
             title="Save Word Document As",
             defaultextension=".docx",
             filetypes=[
@@ -1182,6 +1255,7 @@ class Md2docxGUI:
     def browse_config_file(self) -> None:
         """Open file dialog to select the YAML configuration file."""
         filename = filedialog.askopenfilename(
+            parent=self.dialog_parent(),
             title="Select Configuration File",
             filetypes=[
                 ("YAML files", "*.yaml *.yml"),
@@ -1308,15 +1382,27 @@ class Md2docxGUI:
         output_file = self.output_var.get()
 
         if not input_file:
-            messagebox.showerror("Error", "Please select an input Markdown file.")
+            messagebox.showerror(
+                "Error",
+                "Please select an input Markdown file.",
+                parent=self.dialog_parent(),
+            )
             return
 
         if not output_file:
-            messagebox.showerror("Error", "Please specify an output file path.")
+            messagebox.showerror(
+                "Error",
+                "Please specify an output file path.",
+                parent=self.dialog_parent(),
+            )
             return
 
         if not Path(input_file).exists():
-            messagebox.showerror("Error", f"Input file not found:\n{input_file}")
+            messagebox.showerror(
+                "Error",
+                f"Input file not found:\n{input_file}",
+                parent=self.dialog_parent(),
+            )
             return
 
         thread = threading.Thread(target=self._do_conversion, args=(input_file, output_file))
@@ -1342,6 +1428,7 @@ class Md2docxGUI:
                 lambda: messagebox.showinfo(
                     "Success",
                     f"File converted successfully!\n\nOutput: {output_file}",
+                    parent=self.dialog_parent(),
                 ),
             )
             self.root.after(0, self.refresh_history_list)
@@ -1356,6 +1443,7 @@ class Md2docxGUI:
                 lambda: messagebox.showerror(
                     "Conversion Error",
                     f"Failed to convert file:\n\n{str(exc)}",
+                    parent=self.dialog_parent(),
                 ),
             )
             self.root.after(0, self.refresh_history_list)
@@ -1424,7 +1512,11 @@ class Md2docxGUI:
         """Load selected history item into input fields."""
         selection = self.history_tree.selection()
         if not selection:
-            messagebox.showinfo("Info", "Please select a history item first.")
+            messagebox.showinfo(
+                "Info",
+                "Please select a history item first.",
+                parent=self.dialog_parent(),
+            )
             return
 
         item = selection[0]
@@ -1441,6 +1533,7 @@ class Md2docxGUI:
         if messagebox.askyesno(
             "Confirm Clear History",
             "Are you sure you want to clear all conversion history?",
+            parent=self.dialog_parent(),
         ):
             self.history = []
             self.save_history()
