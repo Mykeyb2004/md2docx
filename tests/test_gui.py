@@ -79,6 +79,157 @@ class _ImmediateRoot:
             callback()
 
 
+class _PositionedWindow:
+    """Tk-like window stand-in for geometry placement tests."""
+
+    def __init__(
+        self,
+        *,
+        width: int,
+        height: int,
+        root_x: int = 0,
+        root_y: int = 0,
+        screen_width: int = 1920,
+        screen_height: int = 1080,
+        vroot_x: int = 0,
+        vroot_y: int = 0,
+        vroot_width: int = 1920,
+        vroot_height: int = 1080,
+    ) -> None:
+        self.width = width
+        self.height = height
+        self.root_x = root_x
+        self.root_y = root_y
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.vroot_x = vroot_x
+        self.vroot_y = vroot_y
+        self.vroot_width = vroot_width
+        self.vroot_height = vroot_height
+        self.geometry_value = ""
+
+    def update_idletasks(self) -> None:
+        pass
+
+    def winfo_width(self) -> int:
+        return self.width
+
+    def winfo_height(self) -> int:
+        return self.height
+
+    def winfo_reqwidth(self) -> int:
+        return self.width
+
+    def winfo_reqheight(self) -> int:
+        return self.height
+
+    def winfo_rootx(self) -> int:
+        return self.root_x
+
+    def winfo_rooty(self) -> int:
+        return self.root_y
+
+    def winfo_screenwidth(self) -> int:
+        return self.screen_width
+
+    def winfo_screenheight(self) -> int:
+        return self.screen_height
+
+    def winfo_vrootx(self) -> int:
+        return self.vroot_x
+
+    def winfo_vrooty(self) -> int:
+        return self.vroot_y
+
+    def winfo_vrootwidth(self) -> int:
+        return self.vroot_width
+
+    def winfo_vrootheight(self) -> int:
+        return self.vroot_height
+
+    def geometry(self, value: str) -> None:
+        self.geometry_value = value
+
+
+def test_center_window_uses_parent_origin_on_negative_secondary_screen():
+    """Child dialogs should follow a parent placed on a left-hand monitor."""
+    parent = _PositionedWindow(
+        width=1000,
+        height=800,
+        root_x=-1600,
+        root_y=100,
+        vroot_x=-1920,
+        vroot_width=3840,
+    )
+    dialog = _PositionedWindow(
+        width=400,
+        height=200,
+        vroot_x=-1920,
+        vroot_width=3840,
+    )
+
+    gui_module.center_window_on_screen(dialog, parent=parent)
+
+    assert dialog.geometry_value == "400x200-1300+400"
+
+
+def test_center_window_clamps_dialog_to_virtual_screen_bounds():
+    """Centered child dialogs should stay visible near desktop edges."""
+    parent = _PositionedWindow(width=320, height=260, root_x=1780, root_y=900)
+    dialog = _PositionedWindow(width=500, height=240)
+
+    gui_module.center_window_on_screen(dialog, parent=parent)
+
+    assert dialog.geometry_value == "500x240+1420+840"
+
+
+def test_main_file_dialogs_are_parented_to_root(monkeypatch):
+    """Native file dialogs should stay associated with the main window."""
+    root = object()
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.root = root
+    gui.input_var = _FakeStringVar()
+    gui.output_var = _FakeStringVar()
+    captured_open = {}
+    captured_save = {}
+
+    monkeypatch.setattr(
+        gui_module.filedialog,
+        "askopenfilename",
+        lambda **kwargs: captured_open.update(kwargs) or "",
+    )
+    monkeypatch.setattr(
+        gui_module.filedialog,
+        "asksaveasfilename",
+        lambda **kwargs: captured_save.update(kwargs) or "",
+    )
+
+    gui.browse_input_file()
+    gui.browse_output_file()
+
+    assert captured_open["parent"] is root
+    assert captured_save["parent"] is root
+
+
+def test_main_validation_errors_are_parented_to_root(monkeypatch):
+    """Validation popups should belong to the active main window."""
+    root = object()
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.root = root
+    gui.input_var = _FakeStringVar("")
+    gui.output_var = _FakeStringVar("")
+    captured = {}
+    monkeypatch.setattr(
+        gui_module.messagebox,
+        "showerror",
+        lambda title, message, **kwargs: captured.update(kwargs),
+    )
+
+    gui.convert_file()
+
+    assert captured["parent"] is root
+
+
 def test_gui_defaults_to_packaged_template_when_no_config_preference(tmp_path: Path):
     """Missing preferences should use built-in defaults without inventing a file."""
     gui = Md2docxGUI.__new__(Md2docxGUI)
