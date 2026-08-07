@@ -12,14 +12,15 @@ from tkinter import colorchooser, filedialog, messagebox, ttk
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from md2docx import Converter
+from md2docx.config_document import (
+    ConfigDocument,
+    ExternalConfigChangeError,
+)
 from md2docx.config_utils import (
     build_config_schema,
     clone_config,
     coerce_config_value,
     format_config_value,
-    load_yaml_config,
-    merge_config,
-    save_yaml_config,
     set_value_at_path,
 )
 from md2docx.styles import StyleManager
@@ -347,6 +348,72 @@ def center_window_on_screen(window: tk.Misc) -> None:
     window.geometry(f"{width}x{height}+{x}+{y}")
 
 
+def ask_three_way_choice(
+    *,
+    parent: tk.Misc,
+    title: str,
+    message: str,
+    choices: Tuple[Tuple[str, str], ...],
+) -> str:
+    """Show a modal prompt with explicit labels and return the selected value."""
+    cancel_value = choices[-1][0]
+    result = {"value": cancel_value}
+    dialog = tk.Toplevel(parent)
+    dialog.title(title)
+    dialog.resizable(False, False)
+    dialog.transient(parent)
+
+    body = ttk.Frame(dialog, padding="16")
+    body.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+    body.columnconfigure(0, weight=1)
+    ttk.Label(body, text=message, justify=tk.LEFT, wraplength=440).grid(
+        row=0,
+        column=0,
+        sticky=(tk.W, tk.E),
+    )
+
+    buttons = ttk.Frame(body)
+    buttons.grid(row=1, column=0, sticky=tk.E, pady=(16, 0))
+
+    def choose(value: str) -> None:
+        result["value"] = value
+        dialog.destroy()
+
+    for index, (value, label) in enumerate(choices):
+        ttk.Button(
+            buttons,
+            text=label,
+            command=lambda selected=value: choose(selected),
+        ).grid(row=0, column=index, padx=(8 if index else 0, 0))
+
+    dialog.protocol("WM_DELETE_WINDOW", lambda: choose(cancel_value))
+    dialog.grab_set()
+    dialog.after(0, lambda: center_window_on_screen(dialog))
+    dialog.wait_window()
+    return result["value"]
+
+
+def ask_unsaved_changes(*, parent: tk.Misc, path: Optional[Path]) -> str:
+    """Ask how to handle a dirty draft before closing the editor."""
+    target = str(path) if path is not None else "尚未关联文件的配置"
+    return ask_three_way_choice(
+        parent=parent,
+        title="配置尚未保存",
+        message=f"{target}\n包含未保存的修改。",
+        choices=(("save", "保存"), ("discard", "放弃"), ("cancel", "取消")),
+    )
+
+
+def ask_external_change(*, parent: tk.Misc, path: Path) -> str:
+    """Ask how to resolve a file changed outside the application."""
+    return ask_three_way_choice(
+        parent=parent,
+        title="配置已在磁盘上修改",
+        message=f"{path}\n已被其他程序修改。",
+        choices=(("reload", "重新载入"), ("overwrite", "覆盖"), ("cancel", "取消")),
+    )
+
+
 @dataclass
 class FieldBinding:
     """Keep a widget variable paired with its schema value."""
@@ -358,32 +425,37 @@ class FieldBinding:
 
 
 class ConfigEditorWindow:
-    """Popup editor for the default YAML configuration."""
+    """Popup editor for the main window's current configuration document."""
 
-    def __init__(self, root: tk.Tk, on_saved: Optional[Callable[[Path], None]] = None) -> None:
+    def __init__(
+        self,
+        root: tk.Tk,
+        document: ConfigDocument,
+        packaged_default_config: Dict[str, Any],
+        on_saved: Optional[Callable[[Path], None]] = None,
+    ) -> None:
         self.root = root
+        self.document = document
         self.on_saved = on_saved
-        self.default_config_path = StyleManager.get_editable_template_path("default")
-        self.packaged_default_config = StyleManager.load_packaged_template("default")
+        self.packaged_default_config = clone_config(packaged_default_config)
 
         self.window = tk.Toplevel(root)
-        self.window.title("默认配置编辑器")
         self.window.geometry("980x760")
         self.window.minsize(860, 640)
         self.window.transient(root)
 
-        self.source_var = tk.StringVar()
-        self.target_var = tk.StringVar(value=str(self.default_config_path))
+        self.source_var = tk.StringVar(value=self.describe_document())
         self.status_var = tk.StringVar(value="已加载当前配置")
 
         self.form_host: Optional[ttk.Frame] = None
         self.notebook: Optional[ttk.Notebook] = None
         self.field_bindings: List[FieldBinding] = []
-        self.current_config: Dict[str, Any] = {}
+        self.current_config = clone_config(self.document.draft_config)
         self.schema_config: Dict[str, Any] = {}
 
+        self.update_window_title()
         self.setup_ui()
-        self.load_effective_config()
+        self.load_config_data(self.document.draft_config, self.describe_document())
 
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.window.grab_set()
@@ -401,7 +473,7 @@ class ConfigEditorWindow:
 
         title = ttk.Label(
             container,
-            text="默认配置文件编辑器",
+            text="编辑配置",
             font=("Helvetica", 16, "bold"),
         )
         title.grid(row=0, column=0, sticky=tk.W, pady=(0, 10))
@@ -410,19 +482,12 @@ class ConfigEditorWindow:
         info_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         info_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(info_frame, text="保存目标:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        ttk.Entry(
-            info_frame,
-            textvariable=self.target_var,
-            state="readonly",
-        ).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(8, 0), pady=2)
-
-        ttk.Label(info_frame, text="当前来源:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        ttk.Label(info_frame, text="当前文件：").grid(row=0, column=0, sticky=tk.W, pady=2)
         ttk.Entry(
             info_frame,
             textvariable=self.source_var,
             state="readonly",
-        ).grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(8, 0), pady=2)
+        ).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(8, 0), pady=2)
 
         self.form_host = ttk.Frame(container)
         self.form_host.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -438,26 +503,20 @@ class ConfigEditorWindow:
 
         ttk.Button(
             action_frame,
-            text="从 YAML 导入",
-            command=self.import_config,
-        ).pack(side=tk.LEFT, padx=(0, 8))
-
-        ttk.Button(
-            action_frame,
-            text="另存为 YAML",
-            command=self.export_config,
-        ).pack(side=tk.LEFT, padx=(0, 8))
-
-        ttk.Button(
-            action_frame,
-            text="恢复默认",
+            text="恢复内置默认",
             command=self.restore_packaged_defaults,
         ).pack(side=tk.LEFT, padx=(0, 8))
 
         ttk.Button(
+            action_frame,
+            text="另存为",
+            command=self.save_config_as,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        ttk.Button(
             button_frame,
-            text="保存到默认配置",
-            command=self.save_default_config,
+            text="保存",
+            command=self.save_config,
         ).grid(row=0, column=1, sticky=tk.E, padx=(8, 8))
 
         ttk.Button(
@@ -473,35 +532,27 @@ class ConfigEditorWindow:
             anchor=tk.W,
         ).grid(row=4, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
 
-    def load_effective_config(self) -> None:
-        """Load the editable default config if present, else use packaged defaults."""
-        loaded_config: Dict[str, Any] = {}
-        source_text = "内置默认模板"
-
-        if self.default_config_path.exists():
-            try:
-                loaded_config = load_yaml_config(self.default_config_path)
-                source_text = str(self.default_config_path)
-            except Exception as exc:
-                messagebox.showwarning(
-                    "配置读取失败",
-                    (
-                        "读取默认配置文件失败，已回退到内置默认模板。\n\n"
-                        f"{exc}\n\n"
-                        "你仍然可以编辑后重新保存覆盖这个文件。"
-                    ),
-                    parent=self.window,
-                )
-
-        self.load_config_data(loaded_config, source_text)
-
     def load_config_data(self, loaded_config: Dict[str, Any], source_text: str) -> None:
         """Load config data into the form."""
-        self.current_config = merge_config(self.packaged_default_config, loaded_config)
+        self.current_config = clone_config(loaded_config)
         self.schema_config = build_config_schema(self.packaged_default_config, loaded_config)
         self.source_var.set(source_text)
-        self.status_var.set("配置已载入，可编辑后保存")
         self.render_form()
+
+    def describe_document(self) -> str:
+        """Return the editor's current file label."""
+        if self.document.current_path is None:
+            return "内置默认（未关联文件）"
+        return str(self.document.current_path)
+
+    def update_window_title(self) -> None:
+        """Keep the editor title associated with the file being edited."""
+        name = (
+            self.document.current_path.name
+            if self.document.current_path is not None
+            else "内置默认"
+        )
+        self.window.title(f"编辑配置 - {name}")
 
     def render_form(self) -> None:
         """Render all config sections into tabs."""
@@ -740,85 +791,129 @@ class ConfigEditorWindow:
 
         return collected
 
-    def save_default_config(self) -> None:
-        """Save the current form to the editable default.yaml."""
+    def update_document_draft(self) -> bool:
+        """Collect form values and update the document's editable snapshot."""
         try:
             config = self.collect_config()
-            save_yaml_config(self.default_config_path, config)
         except Exception as exc:
             messagebox.showerror(
-                "保存失败",
-                f"保存默认配置文件失败：\n\n{exc}",
+                "配置内容无效",
+                f"无法读取当前编辑内容：\n\n{exc}",
                 parent=self.window,
             )
-            return
+            return False
 
         self.current_config = config
-        self.source_var.set(str(self.default_config_path))
-        self.status_var.set(f"已保存到 {self.default_config_path}")
+        self.document.update_draft(config)
+        return True
+
+    def finish_successful_save(self) -> None:
+        """Refresh editor state and notify the main window after a save."""
+        config_path = self.document.current_path
+        if config_path is None:
+            return
+
+        self.current_config = clone_config(self.document.saved_config)
+        self.source_var.set(str(config_path))
+        self.update_window_title()
+        self.status_var.set(f"已保存到 {config_path}")
 
         if self.on_saved:
-            self.on_saved(self.default_config_path)
+            self.on_saved(config_path)
 
-        messagebox.showinfo(
-            "保存成功",
-            f"默认配置已保存到：\n{self.default_config_path}",
-            parent=self.window,
-        )
-
-    def export_config(self) -> None:
-        """Export the current form to another YAML file."""
+    def save_current_draft_as(self) -> bool:
+        """Choose a target, save the existing draft, and switch to that file."""
         filename = filedialog.asksaveasfilename(
             parent=self.window,
-            title="另存为 YAML",
+            title="配置另存为",
             defaultextension=".yaml",
             filetypes=[("YAML files", "*.yaml"), ("YML files", "*.yml"), ("All files", "*.*")],
         )
 
         if not filename:
-            return
+            return False
+
+        target_path = Path(filename).expanduser()
+        if (
+            self.document.current_path is not None
+            and target_path.resolve(strict=False)
+            == self.document.current_path.resolve(strict=False)
+        ):
+            return self.save_config()
 
         try:
-            config = self.collect_config()
-            save_yaml_config(Path(filename), config)
+            self.document.save_as(target_path)
         except Exception as exc:
             messagebox.showerror(
-                "导出失败",
-                f"导出配置文件失败：\n\n{exc}",
+                "保存失败",
+                f"无法保存配置文件：\n\n{exc}",
                 parent=self.window,
             )
-            return
+            return False
 
-        self.status_var.set(f"已导出到 {filename}")
-        messagebox.showinfo(
-            "导出成功",
-            f"配置已导出到：\n{filename}",
-            parent=self.window,
-        )
+        self.finish_successful_save()
+        return True
 
-    def import_config(self) -> None:
-        """Import values from another YAML file into the form."""
-        filename = filedialog.askopenfilename(
-            parent=self.window,
-            title="从 YAML 导入",
-            filetypes=[("YAML files", "*.yaml *.yml"), ("All files", "*.*")],
-        )
+    def save_config_as(self) -> bool:
+        """Save the form to a new YAML file and make it the current file."""
+        if not self.update_document_draft():
+            return False
+        return self.save_current_draft_as()
 
-        if not filename:
-            return
+    def save_config(self) -> bool:
+        """Save the form to its current file, resolving external changes."""
+        if not self.update_document_draft():
+            return False
+
+        if self.document.current_path is None:
+            return self.save_current_draft_as()
 
         try:
-            loaded_config = load_yaml_config(Path(filename))
+            self.document.save()
+        except ExternalConfigChangeError:
+            decision = ask_external_change(
+                parent=self.window,
+                path=self.document.current_path,
+            )
+            if decision == "cancel":
+                return False
+            if decision == "reload":
+                try:
+                    self.document.reload(self.packaged_default_config)
+                except Exception as exc:
+                    messagebox.showerror(
+                        "重新载入失败",
+                        f"无法重新载入配置文件：\n\n{exc}",
+                        parent=self.window,
+                    )
+                    return False
+
+                self.load_config_data(
+                    self.document.draft_config,
+                    self.describe_document(),
+                )
+                self.status_var.set("已重新载入磁盘上的配置")
+                return False
+
+            try:
+                self.document.save(overwrite=True)
+            except Exception as exc:
+                messagebox.showerror(
+                    "保存失败",
+                    f"无法覆盖配置文件：\n\n{exc}",
+                    parent=self.window,
+                )
+                return False
         except Exception as exc:
             messagebox.showerror(
-                "导入失败",
-                f"读取配置文件失败：\n\n{exc}",
+                "保存失败",
+                f"无法保存配置文件：\n\n{exc}",
                 parent=self.window,
             )
-            return
+            return False
 
-        self.load_config_data(loaded_config, str(Path(filename)))
-        self.status_var.set(f"已导入 {filename}，可以保存到默认配置")
+        self.finish_successful_save()
+        return True
 
     def restore_packaged_defaults(self) -> None:
         """Reset the editor to the packaged default template."""
@@ -829,11 +924,25 @@ class ConfigEditorWindow:
         ):
             return
 
-        self.load_config_data({}, "内置默认模板")
-        self.status_var.set("已恢复到内置默认模板，可保存覆盖默认配置文件")
+        self.document.update_draft(self.packaged_default_config)
+        self.load_config_data(self.document.draft_config, self.describe_document())
+        self.status_var.set("已恢复内置默认，保存后才会写入文件")
 
     def close(self) -> None:
-        """Close the popup."""
+        """Close the popup after resolving any unsaved draft."""
+        form_is_valid = self.update_document_draft()
+        if not form_is_valid or self.document.dirty:
+            decision = ask_unsaved_changes(
+                parent=self.window,
+                path=self.document.current_path,
+            )
+            if decision == "cancel":
+                return
+            if decision == "save" and not self.save_config():
+                return
+            if decision == "discard":
+                self.document.discard_draft()
+
         self.window.grab_release()
         self.window.destroy()
 
@@ -847,24 +956,46 @@ class Md2docxGUI:
         self.root.title("Markdown to Word Converter")
         self.root.geometry("900x680")
         self.root.resizable(True, True)
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
 
         app_state_dir = Path.home() / ".md2docx"
         app_state_dir.mkdir(parents=True, exist_ok=True)
         self.history_file = app_state_dir / "history.json"
         self.preferences_file = app_state_dir / "preferences.json"
-        self.packaged_default_config_path = (
-            Path(__file__).resolve().parent / "templates" / "default.yaml"
-        )
-        self.default_config_path = StyleManager.get_editable_template_path("default")
+        self.packaged_default_config = StyleManager.load_packaged_template("default")
         self.config_editor: Optional[ConfigEditorWindow] = None
-        self.config_file_var = tk.StringVar(value=str(self.load_selected_config_path()))
-        self.auto_fix_tables_var = tk.BooleanVar(value=self.load_auto_fix_tables_setting())
+        self.config_document, self.startup_config_error = self.load_initial_config_document()
+        self.config_file_var = tk.StringVar(value=self.describe_current_config())
 
         self.history = self.load_history()
 
         self.setup_ui()
         self.refresh_history_list()
+        if self.startup_config_error:
+            self.root.after(
+                0,
+                lambda error=self.startup_config_error: messagebox.showwarning(
+                    "配置读取失败",
+                    f"无法载入上次使用的配置，已改用内置默认配置。\n\n{error}",
+                    parent=self.root,
+                ),
+            )
         self.root.after(0, lambda: center_window_on_screen(self.root))
+
+    def close(self) -> None:
+        """Close the application after resolving an open editor's draft."""
+        editor = self.config_editor
+        if editor is not None:
+            try:
+                if editor.window.winfo_exists():
+                    editor.close()
+                    if editor.window.winfo_exists():
+                        return
+            except tk.TclError:
+                pass
+            self.config_editor = None
+
+        self.root.destroy()
 
     def setup_ui(self) -> None:
         """Setup user interface components."""
@@ -930,7 +1061,7 @@ class Md2docxGUI:
         )
         output_btn.grid(row=1, column=2, padx=5)
 
-        ttk.Label(conv_frame, text="Config File:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Label(conv_frame, text="当前配置：").grid(row=2, column=0, sticky=tk.W, pady=5)
         config_entry = ttk.Entry(
             conv_frame,
             textvariable=self.config_file_var,
@@ -939,32 +1070,25 @@ class Md2docxGUI:
         )
         config_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=5)
 
-        config_btn = ttk.Button(
+        ttk.Button(
             conv_frame,
-            text="Browse...",
+            text="打开配置...",
             command=self.browse_config_file,
             width=12,
-        )
-        config_btn.grid(row=2, column=2, padx=5)
-
-        table_fix_toggle = ttk.Checkbutton(
-            conv_frame,
-            text="自动修复不规范表格（补 separator）",
-            variable=self.auto_fix_tables_var,
-        )
-        table_fix_toggle.grid(row=3, column=1, columnspan=2, sticky=tk.W, padx=5, pady=(6, 0))
-
-        self.progress = ttk.Progressbar(conv_frame, mode="indeterminate", length=240)
-        self.progress.grid(row=4, column=0, pady=(15, 0), sticky=(tk.W, tk.E))
-
-        action_frame = ttk.Frame(conv_frame)
-        action_frame.grid(row=4, column=1, columnspan=2, pady=(15, 0), sticky=tk.E)
+        ).grid(row=2, column=2, padx=5)
 
         ttk.Button(
-            action_frame,
-            text="⚙️ 配置...",
+            conv_frame,
+            text="编辑配置...",
             command=self.open_config_editor,
-        ).pack(side=tk.LEFT, padx=(0, 8))
+            width=12,
+        ).grid(row=2, column=3, padx=5)
+
+        self.progress = ttk.Progressbar(conv_frame, mode="indeterminate", length=240)
+        self.progress.grid(row=3, column=0, pady=(15, 0), sticky=(tk.W, tk.E))
+
+        action_frame = ttk.Frame(conv_frame)
+        action_frame.grid(row=3, column=1, columnspan=3, pady=(15, 0), sticky=tk.E)
 
         ttk.Button(
             action_frame,
@@ -1065,12 +1189,34 @@ class Md2docxGUI:
             ],
         )
 
-        if filename:
-            config_path = Path(filename)
-            self.config_file_var.set(str(config_path))
-            self.save_selected_config_path(config_path)
-            self.auto_fix_tables_var.set(self.load_auto_fix_tables_setting())
-            self.status_var.set(f"Config selected: {config_path}")
+        if not filename:
+            return
+
+        config_path = Path(filename).expanduser()
+        try:
+            loaded_document = ConfigDocument.load(
+                config_path,
+                self.packaged_default_config,
+            )
+        except Exception as exc:
+            messagebox.showerror(
+                "配置读取失败",
+                f"无法打开配置文件：\n{config_path}\n\n{exc}",
+                parent=self.root if hasattr(self, "root") else None,
+            )
+            return
+
+        self.config_document = loaded_document
+        self.config_file_var.set(self.describe_current_config())
+        preference_saved = self.save_last_config_path(config_path)
+        self.status_var.set(f"已打开配置：{config_path}")
+
+        if not preference_saved:
+            messagebox.showwarning(
+                "偏好保存失败",
+                "配置已打开，但无法记录为下次启动配置。",
+                parent=self.root if hasattr(self, "root") else None,
+            )
 
     def open_config_editor(self) -> None:
         """Open the configuration popup from the main window."""
@@ -1079,83 +1225,82 @@ class Md2docxGUI:
             self.config_editor.window.focus_force()
             return
 
-        self.config_editor = ConfigEditorWindow(self.root, on_saved=self.on_config_saved)
-        self.status_var.set(f"Config editor opened: {self.default_config_path}")
+        self.config_editor = ConfigEditorWindow(
+            self.root,
+            document=self.config_document,
+            packaged_default_config=self.packaged_default_config,
+            on_saved=self.on_config_saved,
+        )
+        self.status_var.set("已打开配置编辑器")
 
     def on_config_saved(self, config_path: Path) -> None:
         """Handle successful config saves from the popup."""
-        self.config_file_var.set(str(config_path))
-        self.save_selected_config_path(config_path)
-        self.auto_fix_tables_var.set(self.load_auto_fix_tables_setting())
-        self.status_var.set(f"Default config saved and selected: {config_path}")
+        self.config_file_var.set(self.describe_current_config())
+        preference_saved = self.save_last_config_path(config_path)
+        self.status_var.set(f"已保存配置：{config_path}")
 
-    def load_selected_config_path(self) -> Path:
-        """Load the user's selected conversion config path."""
+        if not preference_saved:
+            messagebox.showwarning(
+                "偏好保存失败",
+                "配置已保存，但无法记录为下次启动配置。",
+                parent=self.root,
+            )
+
+    def load_last_config_path(self) -> Optional[Path]:
+        """Load the last successfully used path, including the legacy key."""
         try:
             if self.preferences_file.exists():
                 with open(self.preferences_file, "r", encoding="utf-8") as handle:
                     loaded = json.load(handle)
 
                 if isinstance(loaded, dict):
-                    config_file = loaded.get("config_file")
+                    config_file = loaded.get("last_config_path") or loaded.get("config_file")
                     if isinstance(config_file, str) and config_file:
-                        config_path = Path(config_file).expanduser()
-                        if config_path.exists():
-                            return config_path
+                        return Path(config_file).expanduser()
         except Exception:
             pass
 
-        return self.packaged_default_config_path
+        return None
 
-    def save_selected_config_path(self, config_path: Path) -> None:
-        """Persist the user's selected conversion config path."""
+    def load_initial_config_document(self) -> Tuple[ConfigDocument, Optional[str]]:
+        """Load the last file transactionally, falling back to built-in defaults."""
+        config_path = self.load_last_config_path()
+        if config_path is None:
+            return ConfigDocument.from_defaults(self.packaged_default_config), None
+
+        try:
+            return ConfigDocument.load(config_path, self.packaged_default_config), None
+        except Exception as exc:
+            return (
+                ConfigDocument.from_defaults(self.packaged_default_config),
+                f"{config_path}\n{exc}",
+            )
+
+    def save_last_config_path(self, config_path: Path) -> bool:
+        """Persist the last successfully opened or saved config path."""
         try:
             self.preferences_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.preferences_file, "w", encoding="utf-8") as handle:
                 json.dump(
-                    {"config_file": str(config_path)},
+                    {"last_config_path": str(config_path)},
                     handle,
                     indent=2,
                     ensure_ascii=False,
                 )
         except Exception as exc:
             print(f"Failed to save preferences: {exc}")
+            return False
+        return True
 
-    def get_selected_config_path(self) -> Path:
-        """Return the current config path, falling back to the bundled default."""
-        config_file = self.config_file_var.get().strip()
-        config_path = (
-            Path(config_file).expanduser()
-            if config_file
-            else self.packaged_default_config_path
-        )
+    def describe_current_config(self) -> str:
+        """Return the path label displayed in the main window and editor."""
+        if self.config_document.current_path is None:
+            return "内置默认（未关联文件）"
+        return str(self.config_document.current_path)
 
-        if config_path.exists():
-            return config_path
-
-        self.config_file_var.set(str(self.packaged_default_config_path))
-        return self.packaged_default_config_path
-
-    def load_auto_fix_tables_setting(self) -> bool:
-        """Load the selected config value for malformed-table auto-fixing."""
-        config = StyleManager.load_packaged_template("default")
-        config_path = self.get_selected_config_path()
-
-        if config_path.exists():
-            try:
-                config = merge_config(config, load_yaml_config(config_path))
-            except Exception:
-                pass
-
-        return bool(config.get("document", {}).get("auto_fix_tables", False))
-
-    def build_runtime_config_override(self) -> Dict[str, Any]:
-        """Build per-run config overrides from the main GUI switches."""
-        return {
-            "document": {
-                "auto_fix_tables": bool(self.auto_fix_tables_var.get()),
-            }
-        }
+    def build_effective_conversion_config(self) -> Dict[str, Any]:
+        """Return an isolated copy of the last loaded or saved config."""
+        return clone_config(self.config_document.saved_config)
 
     def convert_file(self) -> None:
         """Convert Markdown file to Word document."""
@@ -1183,17 +1328,8 @@ class Md2docxGUI:
         try:
             self.root.after(0, self.progress.start)
             self.root.after(0, lambda: self.status_var.set("Converting..."))
-            config_override = self.build_runtime_config_override()
-            config_path = self.get_selected_config_path()
-
-            if config_path.exists():
-                self.save_selected_config_path(config_path)
-                converter = Converter(
-                    style_config=str(config_path),
-                    config_override=config_override,
-                )
-            else:
-                converter = Converter(config_override=config_override)
+            config_data = self.build_effective_conversion_config()
+            converter = Converter(config_data=config_data)
 
             converter.convert(input_file, output_file)
 

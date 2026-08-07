@@ -2,8 +2,11 @@
 Helpers for loading, merging, and saving YAML configuration data.
 """
 import copy
+import os
+import stat
+import tempfile
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import yaml
 
@@ -77,11 +80,55 @@ def dump_yaml_config(config: Dict[str, Any]) -> str:
     )
 
 
+def _fsync_directory(path: Path) -> None:
+    """Best-effort sync of a directory entry after an atomic replacement."""
+    try:
+        descriptor = os.open(str(path), os.O_RDONLY)
+    except OSError:
+        return
+
+    try:
+        os.fsync(descriptor)
+    except OSError:
+        pass
+    finally:
+        os.close(descriptor)
+
+
 def save_yaml_config(path: Path, config: Dict[str, Any]) -> None:
-    """Save config as YAML."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(dump_yaml_config(config))
+    """Save config atomically so a failed write preserves the previous file."""
+    path = Path(path).expanduser()
+    destination = path.resolve(strict=False) if path.is_symlink() else path
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    existing_mode = (
+        stat.S_IMODE(destination.stat().st_mode)
+        if destination.exists()
+        else None
+    )
+    temporary_path: Optional[Path] = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(dump_yaml_config(config))
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        if existing_mode is not None:
+            os.chmod(temporary_path, existing_mode)
+
+        os.replace(temporary_path, destination)
+        _fsync_directory(destination.parent)
+    finally:
+        if temporary_path is not None and temporary_path.exists():
+            temporary_path.unlink()
 
 
 def set_value_at_path(config: Dict[str, Any], path: ConfigPath, value: Any) -> None:
