@@ -65,6 +65,16 @@ class _FakeWidget:
         self.configured.update(kwargs)
 
 
+def _iter_leaf_config_paths(data, path=()):
+    """Yield leaf paths from a nested config dictionary."""
+    if isinstance(data, dict):
+        for key, value in data.items():
+            yield from _iter_leaf_config_paths(value, path + (key,))
+        return
+
+    yield path, data
+
+
 class _FakeProgress:
     def start(self) -> None:
         pass
@@ -474,16 +484,25 @@ def test_config_editor_rule_uses_color_control_for_color_fields():
 def test_config_editor_rule_keeps_fixed_enums_readonly():
     """Known fixed-value fields should prevent unsupported free text."""
     page_rule = gui_module.resolve_field_widget_rule(("document", "page_size"))
+    alignment_rule = gui_module.resolve_field_widget_rule(("paragraph", "alignment"))
     table_rule = gui_module.resolve_field_widget_rule(
         ("table", "column_width_strategy")
     )
 
     assert page_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
     assert page_rule.readonly is True
-    assert page_rule.options == ("A4", "A3", "Letter")
+    assert page_rule.options == ("A4", "A3", "Letter（信纸）")
+    assert page_rule.value_mapping[-1] == ("Letter（信纸）", "Letter")
+    assert alignment_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
+    assert alignment_rule.readonly is True
+    assert alignment_rule.options == ("左对齐", "居中", "右对齐", "两端对齐")
     assert table_rule.kind == gui_module.FIELD_WIDGET_COMBOBOX
     assert table_rule.readonly is True
-    assert table_rule.options == ("content-weighted", "balanced")
+    assert table_rule.options == ("按内容分配", "均衡分配")
+    assert table_rule.value_mapping == (
+        ("按内容分配", "content-weighted"),
+        ("均衡分配", "balanced"),
+    )
 
 
 def test_config_editor_rule_maps_table_layout_presets_to_stable_values():
@@ -506,6 +525,56 @@ def test_config_editor_resolves_table_layout_label():
         gui_module.resolve_field_label(("table", "layout"), "layout", "accent_grid")
         == "表格样式"
     )
+
+
+def test_config_editor_translates_packaged_default_fields_and_tips():
+    """Every default config field should show a Chinese label with field help."""
+    default_config = load_yaml_config(Path("md2docx/templates/default.yaml"))
+    untranslated = []
+    missing_tips = []
+
+    for path, value in _iter_leaf_config_paths(default_config):
+        field_name = path[-1]
+        label = gui_module.resolve_field_label(path, field_name, value)
+        tip = gui_module.resolve_field_tip(path, value)
+        if label == field_name:
+            untranslated.append(".".join(path))
+        if not tip:
+            missing_tips.append(".".join(path))
+
+    assert untranslated == []
+    assert missing_tips == []
+
+
+def test_config_editor_create_field_tip_widget_keeps_tooltip_alive(monkeypatch):
+    """Field tips should render a visible help marker with retained tooltip state."""
+    created_tooltips = []
+
+    def make_widget(widget_type):
+        def factory(*args, **kwargs):
+            return _FakeWidget(widget_type, *args, **kwargs)
+
+        return factory
+
+    class FakeTooltip:
+        def __init__(self, widget, text):
+            self.widget = widget
+            self.text = text
+            created_tooltips.append(self)
+
+    monkeypatch.setattr(gui_module.ttk, "Label", make_widget("label"))
+    monkeypatch.setattr(gui_module, "Tooltip", FakeTooltip, raising=False)
+
+    editor = gui_module.ConfigEditorWindow.__new__(gui_module.ConfigEditorWindow)
+    editor.tooltips = []
+
+    widget = editor.create_field_tip_widget(object(), "设置 Word 第一节页面尺寸。")
+
+    assert widget.widget_type == "label"
+    assert widget.kwargs["text"] == "?"
+    assert created_tooltips[0].widget is widget
+    assert created_tooltips[0].text == "设置 Word 第一节页面尺寸。"
+    assert editor.tooltips == created_tooltips
 
 
 def test_config_editor_rule_keeps_common_sizes_editable():
@@ -662,7 +731,7 @@ def test_config_editor_create_field_widget_dispatches_enhanced_controls(monkeypa
 
     assert readonly_combo.widget_type == "combobox"
     assert readonly_combo.kwargs["state"] == "readonly"
-    assert readonly_combo.kwargs["values"] == ("A4", "A3", "Letter")
+    assert readonly_combo.kwargs["values"] == ("A4", "A3", "Letter（信纸）")
 
     assert entry.widget_type == "entry"
     assert len(editor.field_bindings) == 5
