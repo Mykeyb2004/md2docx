@@ -98,28 +98,73 @@ TABLE_LAYOUT_VALUE_MAPPING = (
     ("三线表", "three_line"),
     ("简洁网格表", "plain_grid"),
 )
+PAGE_SIZE_VALUE_MAPPING = (
+    ("A4", "A4"),
+    ("A3", "A3"),
+    ("Letter（信纸）", "Letter"),
+)
+HORIZONTAL_ALIGNMENT_VALUE_MAPPING = (
+    ("左对齐", "left"),
+    ("居中", "center"),
+    ("右对齐", "right"),
+    ("两端对齐", "justify"),
+)
+IMAGE_ALIGNMENT_VALUE_MAPPING = (
+    ("左对齐", "left"),
+    ("居中", "center"),
+    ("右对齐", "right"),
+)
+VERTICAL_ALIGNMENT_VALUE_MAPPING = (
+    ("顶端对齐", "top"),
+    ("垂直居中", "center"),
+    ("底端对齐", "bottom"),
+)
+HEADER_ALIGNMENT_VALUE_MAPPING = (
+    *HORIZONTAL_ALIGNMENT_VALUE_MAPPING,
+    ("继承列对齐", "inherit"),
+)
+COLUMN_WIDTH_STRATEGY_VALUE_MAPPING = (
+    ("按内容分配", "content-weighted"),
+    ("均衡分配", "balanced"),
+)
+MERMAID_FORMAT_VALUE_MAPPING = (
+    ("PNG 图片", "png"),
+    ("SVG 矢量图", "svg"),
+    ("PDF 文件", "pdf"),
+)
+MERMAID_THEME_VALUE_MAPPING = (
+    ("默认主题", "default"),
+    ("Base 主题（适合自定义变量）", "base"),
+    ("深色主题", "dark"),
+    ("森林主题", "forest"),
+    ("中性主题", "neutral"),
+)
+MERMAID_OVERSIZED_STRATEGY_VALUE_MAPPING = (
+    ("页面布局", "page"),
+    ("仅按比例缩放", "scale"),
+)
 
 READONLY_FIELD_VALUE_MAPPINGS: Dict[ConfigPath, Tuple[Tuple[str, str], ...]] = {
+    ("document", "page_size"): PAGE_SIZE_VALUE_MAPPING,
     ("table", "layout"): TABLE_LAYOUT_VALUE_MAPPING,
+    ("heading1", "alignment"): HORIZONTAL_ALIGNMENT_VALUE_MAPPING,
+    ("heading2", "alignment"): HORIZONTAL_ALIGNMENT_VALUE_MAPPING,
+    ("heading3", "alignment"): HORIZONTAL_ALIGNMENT_VALUE_MAPPING,
+    ("heading4", "alignment"): HORIZONTAL_ALIGNMENT_VALUE_MAPPING,
+    ("paragraph", "alignment"): HORIZONTAL_ALIGNMENT_VALUE_MAPPING,
+    ("table", "alignment"): HORIZONTAL_ALIGNMENT_VALUE_MAPPING,
+    ("table", "header_alignment"): HEADER_ALIGNMENT_VALUE_MAPPING,
+    ("table", "vertical_alignment"): VERTICAL_ALIGNMENT_VALUE_MAPPING,
+    ("table", "header_vertical_alignment"): VERTICAL_ALIGNMENT_VALUE_MAPPING,
+    ("table", "column_width_strategy"): COLUMN_WIDTH_STRATEGY_VALUE_MAPPING,
+    ("math_block", "alignment"): IMAGE_ALIGNMENT_VALUE_MAPPING,
+    ("mermaid", "format"): MERMAID_FORMAT_VALUE_MAPPING,
+    ("mermaid", "theme"): MERMAID_THEME_VALUE_MAPPING,
+    ("mermaid", "alignment"): IMAGE_ALIGNMENT_VALUE_MAPPING,
+    ("mermaid", "oversized_strategy"): MERMAID_OVERSIZED_STRATEGY_VALUE_MAPPING,
 }
 
 READONLY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
-    ("document", "page_size"): ("A4", "A3", "Letter"),
-    ("heading1", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
-    ("heading2", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
-    ("heading3", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
-    ("heading4", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
-    ("paragraph", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
-    ("table", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
-    ("table", "header_alignment"): HEADER_ALIGNMENT_OPTIONS,
-    ("table", "vertical_alignment"): VERTICAL_ALIGNMENT_OPTIONS,
-    ("table", "header_vertical_alignment"): VERTICAL_ALIGNMENT_OPTIONS,
-    ("table", "column_width_strategy"): ("content-weighted", "balanced"),
-    ("math_block", "alignment"): IMAGE_ALIGNMENT_OPTIONS,
-    ("mermaid", "format"): ("png", "svg", "pdf"),
-    ("mermaid", "theme"): ("default", "base", "dark", "forest", "neutral"),
-    ("mermaid", "alignment"): IMAGE_ALIGNMENT_OPTIONS,
-    ("mermaid", "oversized_strategy"): ("page", "scale"),
 }
 
 LEGACY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
@@ -142,8 +187,272 @@ LEGACY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
 # The enhanced editor uses resolve_field_widget_rule() for richer widget metadata.
 FIELD_OPTIONS = LEGACY_FIELD_OPTIONS
 
+SECTION_LABELS: Dict[ConfigPath, str] = {
+    ("document",): "文档设置",
+    ("metadata",): "文档属性",
+    ("heading1",): "一级标题",
+    ("heading2",): "二级标题",
+    ("heading3",): "三级标题",
+    ("heading4",): "四级标题",
+    ("outline",): "中文大纲",
+    ("outline", "level1"): "一级大纲覆盖",
+    ("outline", "level2"): "二级大纲覆盖",
+    ("outline", "level3"): "三级大纲覆盖",
+    ("outline", "level4"): "四级大纲覆盖",
+    ("paragraph",): "正文段落",
+    ("inline",): "行内样式",
+    ("inline", "bold"): "加粗文本",
+    ("inline", "italic"): "斜体文本",
+    ("inline", "code"): "行内代码",
+    ("code_block",): "代码块",
+    ("table",): "表格样式",
+    ("list",): "列表样式",
+    ("math_inline",): "行内公式",
+    ("math_block",): "块级公式",
+    ("mermaid",): "Mermaid 图",
+    ("mermaid", "theme_variables"): "Mermaid 主题变量",
+    ("chapter_scan",): "章节扫描",
+}
+
+COMMON_FIELD_LABELS: Dict[str, str] = {
+    "font_name": "字体",
+    "font_size": "字号",
+    "font_color": "字体颜色",
+    "bold": "加粗",
+    "italic": "斜体",
+    "space_before": "段前间距",
+    "space_after": "段后间距",
+    "alignment": "水平对齐",
+    "first_line_indent": "首行缩进",
+    "line_spacing": "行距",
+    "background": "背景色",
+    "border_color": "边框颜色",
+    "width": "宽度",
+    "height": "高度",
+    "dpi": "渲染分辨率",
+}
+
 FIELD_LABELS: Dict[ConfigPath, str] = {
+    ("document", "page_size"): "页面大小",
+    ("document", "margin_top"): "上页边距",
+    ("document", "margin_bottom"): "下页边距",
+    ("document", "margin_left"): "左页边距",
+    ("document", "margin_right"): "右页边距",
+    ("document", "line_spacing"): "文档行距",
+    ("document", "ignore_thematic_breaks"): "忽略分割线",
+    ("document", "auto_fix_tables"): "自动修复表格",
+    ("document", "outline_mode"): "大纲识别模式",
+    ("metadata", "author"): "作者",
+    ("metadata", "last_modified_by"): "最后修改者",
+    ("metadata", "title"): "标题",
+    ("metadata", "subject"): "主题",
+    ("metadata", "keywords"): "关键词",
+    ("metadata", "comments"): "备注",
+    ("metadata", "category"): "类别",
+    ("outline", "level1_style"): "一级大纲继承样式",
+    ("outline", "level2_style"): "二级大纲继承样式",
+    ("outline", "level3_style"): "三级大纲继承样式",
+    ("outline", "level4_style"): "四级大纲继承样式",
+    ("inline", "bold", "font_color"): "加粗文本颜色",
+    ("inline", "italic", "font_color"): "斜体文本颜色",
+    ("inline", "code", "font_name"): "行内代码字体",
+    ("inline", "code", "font_size"): "行内代码字号",
+    ("inline", "code", "font_color"): "行内代码文字颜色",
+    ("inline", "code", "background"): "行内代码背景色",
+    ("code_block", "font_name"): "代码块字体",
+    ("code_block", "font_size"): "代码块字号",
+    ("code_block", "font_color"): "代码文字颜色",
+    ("code_block", "background"): "代码块背景色",
+    ("code_block", "border_color"): "代码块边框颜色",
+    ("code_block", "padding"): "代码块内边距",
     ("table", "layout"): "表格样式",
+    ("table", "style"): "Word 表格样式",
+    ("table", "font_name"): "表格字体",
+    ("table", "font_size"): "表格字号",
+    ("table", "line_spacing"): "表格行距",
+    ("table", "header_bold"): "表头加粗",
+    ("table", "header_background"): "表头背景色",
+    ("table", "header_alignment"): "表头水平对齐",
+    ("table", "vertical_alignment"): "表体垂直对齐",
+    ("table", "cell_margin_vertical"): "单元格上下内边距",
+    ("table", "cell_margin_horizontal"): "单元格左右内边距",
+    ("table", "header_vertical_alignment"): "表头垂直对齐",
+    ("table", "column_width_strategy"): "列宽策略",
+    ("table", "alignment"): "表体水平对齐",
+    ("table", "alternating_rows"): "启用斑马纹",
+    ("table", "row_background_odd"): "奇数行背景色",
+    ("table", "row_background_even"): "偶数行背景色",
+    ("list", "font_name"): "列表字体",
+    ("list", "font_size"): "列表字号",
+    ("list", "line_spacing"): "列表行距",
+    ("list", "bullet_char"): "无序列表符号",
+    ("list", "number_format"): "有序编号格式",
+    ("list", "ordered_list_as_text"): "有序列表转文本",
+    ("list", "indent_size"): "嵌套缩进",
+    ("list", "space_after"): "列表段后间距",
+    ("math_inline", "height"): "行内公式图片高度",
+    ("math_inline", "dpi"): "行内公式分辨率",
+    ("math_block", "width"): "块级公式图片宽度",
+    ("math_block", "alignment"): "块级公式对齐",
+    ("math_block", "space_before"): "公式段前间距",
+    ("math_block", "space_after"): "公式段后间距",
+    ("math_block", "dpi"): "块级公式分辨率",
+    ("mermaid", "command"): "Mermaid 命令",
+    ("mermaid", "format"): "输出格式",
+    ("mermaid", "theme"): "主题",
+    ("mermaid", "width"): "图片宽度",
+    ("mermaid", "alignment"): "图片对齐",
+    ("mermaid", "space_before"): "图前间距",
+    ("mermaid", "space_after"): "图后间距",
+    ("mermaid", "background_color"): "图片背景色",
+    ("mermaid", "theme_variables", "primaryColor"): "主色",
+    ("mermaid", "theme_variables", "primaryTextColor"): "主文字色",
+    ("mermaid", "theme_variables", "primaryBorderColor"): "主边框色",
+    ("mermaid", "theme_variables", "lineColor"): "连线颜色",
+    ("mermaid", "theme_variables", "secondaryColor"): "辅助色",
+    ("mermaid", "theme_variables", "tertiaryColor"): "第三级颜色",
+    ("mermaid", "theme_variables", "clusterBkg"): "子图背景色",
+    ("mermaid", "theme_variables", "clusterBorder"): "子图边框色",
+    ("mermaid", "theme_variables", "edgeLabelBackground"): "连线标签背景色",
+    ("mermaid", "soft_max_height_ratio"): "软高度比例",
+    ("mermaid", "hard_max_height_ratio"): "硬高度比例",
+    ("mermaid", "page_max_height_ratio"): "页面最大高度比例",
+    ("mermaid", "page_break_threshold_ratio"): "分页阈值比例",
+    ("mermaid", "min_readable_width"): "最小可读宽度",
+    ("mermaid", "oversized_strategy"): "超大图处理策略",
+    ("mermaid", "force_page_break_before_oversized"): "超大图前强制分页",
+    ("mermaid", "keep_with_previous"): "与前段同页",
+    ("mermaid", "keep_with_previous_max_chars"): "前段最长字符数",
+    ("mermaid", "follow_previous_trigger_height_ratio"): "跟随前段高度阈值",
+    ("mermaid", "follow_previous_width_ratio"): "跟随前段宽度比例",
+    ("mermaid", "follow_previous_space_before"): "跟随前段图前距",
+    ("mermaid", "keep_together"): "图段落保持完整",
+    ("mermaid", "keep_with_next"): "与后段同页",
+    ("mermaid", "widow_control"): "孤行控制",
+    ("chapter_scan", "target_dir"): "扫描目录",
+    ("chapter_scan", "glob"): "文件匹配模式",
+    ("chapter_scan", "recursive"): "递归扫描",
+}
+
+COMMON_FIELD_TIPS: Dict[str, str] = {
+    "font_name": "设置该样式使用的字体名称，同时用于中文字体映射。",
+    "font_size": "设置文字字号，通常使用 pt 单位，例如 14pt。",
+    "font_color": "设置文字颜色，支持 #RRGGBB、短 hex 或 null 继承。",
+    "bold": "控制该样式文字是否加粗。",
+    "italic": "控制该样式文字是否斜体。",
+    "space_before": "设置段落前方间距，支持 pt、cm、mm、in 等单位。",
+    "space_after": "设置段落后方间距，支持 pt、cm、mm、in 等单位。",
+    "alignment": "设置段落或图片的水平对齐方式。",
+    "first_line_indent": "设置首行缩进字符数，按当前字号换算为 pt。",
+    "line_spacing": "设置该样式的行距倍数。",
+    "background": "设置背景色，通常使用 #RRGGBB。",
+    "border_color": "设置边框颜色；部分模板字段当前仅保留，不一定直接渲染。",
+    "width": "设置图片或块级元素的首选宽度。",
+    "height": "设置图片或行内元素的首选高度。",
+    "dpi": "设置回退图片渲染分辨率；数值越大图片越清晰但体积更大。",
+}
+
+FIELD_TIPS: Dict[ConfigPath, str] = {
+    ("document", "page_size"): "设置 Word 第一节页面尺寸，支持 A4、A3 和 Letter。",
+    ("document", "margin_top"): "设置页面上边距，支持 cm、mm、in、pt。",
+    ("document", "margin_bottom"): "设置页面下边距，支持 cm、mm、in、pt。",
+    ("document", "margin_left"): "设置页面左边距，支持 cm、mm、in、pt。",
+    ("document", "margin_right"): "设置页面右边距，支持 cm、mm、in、pt。",
+    ("document", "line_spacing"): "模板保留的文档级行距；正文、表格、列表请分别配置各自行距。",
+    ("document", "ignore_thematic_breaks"): "控制是否忽略 Markdown 分割线 ---、*** 等。",
+    ("document", "auto_fix_tables"): "控制是否尝试修复缺少 separator 行的不规范 Markdown 表格。",
+    ("document", "outline_mode"): "控制中文公文式大纲识别：auto 自动、on 强制开启、off 关闭。",
+    ("metadata", "author"): "写入 Word 文档属性中的作者；为空时会尝试使用当前系统用户。",
+    ("metadata", "last_modified_by"): "写入 Word 文档属性中的最后修改者；为空时使用作者。",
+    ("metadata", "title"): "写入 Word 文档标题；为空时会从 Markdown 内容推导。",
+    ("metadata", "subject"): "写入 Word 文档属性中的主题。",
+    ("metadata", "keywords"): "写入 Word 文档关键词；列表会用英文逗号拼接。",
+    ("metadata", "comments"): "写入 Word 文档属性中的备注。",
+    ("metadata", "category"): "写入 Word 文档属性中的类别。",
+    ("outline", "level1_style"): "指定一级中文大纲先继承的样式块。",
+    ("outline", "level2_style"): "指定二级中文大纲先继承的样式块。",
+    ("outline", "level3_style"): "指定三级中文大纲先继承的样式块。",
+    ("outline", "level4_style"): "指定四级中文大纲先继承的样式块。",
+    ("inline", "bold", "font_color"): "设置 Markdown 加粗文本颜色；null 表示继承原颜色。",
+    ("inline", "italic", "font_color"): "设置 Markdown 斜体文本颜色；null 表示继承原颜色。",
+    ("inline", "code", "font_name"): "设置 Markdown 行内代码的字体。",
+    ("inline", "code", "font_size"): "设置 Markdown 行内代码的字号。",
+    ("inline", "code", "font_color"): "设置 Markdown 行内代码的文字颜色。",
+    ("inline", "code", "background"): "设置 Markdown 行内代码的背景色。",
+    ("code_block", "font_name"): "设置 fenced code block 的字体。",
+    ("code_block", "font_size"): "设置 fenced code block 的字号。",
+    ("code_block", "font_color"): "设置代码块文字颜色。",
+    ("code_block", "background"): "设置代码块段落背景色。",
+    ("code_block", "border_color"): "代码块边框颜色字段当前保留，渲染代码暂未直接读取。",
+    ("code_block", "padding"): "设置代码块近似内边距，当前通过行首空格模拟。",
+    ("table", "layout"): "选择表格预设样式；界面显示中文，保存为稳定 YAML 值。",
+    ("table", "style"): "设置 Word 内置表格样式名；样式不存在时会忽略并使用默认样式。",
+    ("table", "font_name"): "设置表格单元格文字字体。",
+    ("table", "font_size"): "设置表格单元格文字字号。",
+    ("table", "line_spacing"): "设置表格单元格段落行距。",
+    ("table", "header_bold"): "模板字段当前保留；表头目前总是加粗。",
+    ("table", "header_background"): "设置表头单元格背景色。",
+    ("table", "header_alignment"): "设置表头水平对齐；继承时跟随列对齐或表格默认对齐。",
+    ("table", "vertical_alignment"): "设置表体单元格垂直对齐。",
+    ("table", "cell_margin_vertical"): "设置单元格上下内边距。",
+    ("table", "cell_margin_horizontal"): "设置单元格左右内边距。",
+    ("table", "header_vertical_alignment"): "设置表头单元格垂直对齐。",
+    ("table", "column_width_strategy"): "设置列宽策略：按内容分配或更均衡保守。",
+    ("table", "border_color"): "表格边框颜色字段当前保留，部分布局不直接读取。",
+    ("table", "alignment"): "设置表体单元格默认水平对齐；Markdown 列对齐优先级更高。",
+    ("table", "alternating_rows"): "控制是否启用表体奇偶行交替背景色。",
+    ("table", "row_background_odd"): "设置奇数表体行背景色，表头不计入表体行。",
+    ("table", "row_background_even"): "设置偶数表体行背景色，表头不计入表体行。",
+    ("list", "font_name"): "设置列表项文字字体。",
+    ("list", "font_size"): "设置列表项文字字号。",
+    ("list", "line_spacing"): "设置列表项行距。",
+    ("list", "bullet_char"): "设置无序列表符号；默认符号使用 Word 列表样式。",
+    ("list", "number_format"): "设置文本编号格式，仅在有序列表转文本时生效。",
+    ("list", "ordered_list_as_text"): "控制有序列表是否写成普通文本而非 Word 自动编号。",
+    ("list", "indent_size"): "设置嵌套列表每级缩进。",
+    ("list", "space_after"): "设置列表项段后间距。",
+    ("math_inline", "height"): "行内公式图片回退高度字段；当前行为等同默认值。",
+    ("math_inline", "dpi"): "行内公式图片回退分辨率字段；当前行为等同默认值。",
+    ("math_block", "width"): "块级公式回退为图片时的图片宽度。",
+    ("math_block", "alignment"): "设置块级公式段落对齐，未知值回退为居中。",
+    ("math_block", "space_before"): "设置块级公式段前间距。",
+    ("math_block", "space_after"): "设置块级公式段后间距。",
+    ("math_block", "dpi"): "块级公式图片回退分辨率字段；当前行为等同默认值。",
+    ("mermaid", "command"): "设置 Mermaid CLI 命令或可执行文件路径。",
+    ("mermaid", "format"): "设置 Mermaid 转换输出格式；插入 Word 最稳妥的是 PNG。",
+    ("mermaid", "theme"): "设置 Mermaid 内置主题；使用主题变量时建议 base。",
+    ("mermaid", "width"): "设置 Mermaid 图首选宽度，最终不会超过页面可用宽度。",
+    ("mermaid", "alignment"): "设置 Mermaid 图片所在段落的水平对齐。",
+    ("mermaid", "space_before"): "设置 Mermaid 图前间距。",
+    ("mermaid", "space_after"): "设置 Mermaid 图后间距。",
+    ("mermaid", "background_color"): "设置 Mermaid 输出图片背景色。",
+    ("mermaid", "theme_variables", "primaryColor"): "设置 Mermaid 节点主背景色。",
+    ("mermaid", "theme_variables", "primaryTextColor"): "设置 Mermaid 主节点文字颜色。",
+    ("mermaid", "theme_variables", "primaryBorderColor"): "设置 Mermaid 主节点边框颜色。",
+    ("mermaid", "theme_variables", "lineColor"): "设置 Mermaid 连线颜色。",
+    ("mermaid", "theme_variables", "secondaryColor"): "设置 Mermaid 辅助节点颜色。",
+    ("mermaid", "theme_variables", "tertiaryColor"): "设置 Mermaid 第三级节点颜色。",
+    ("mermaid", "theme_variables", "clusterBkg"): "设置 Mermaid 子图背景色。",
+    ("mermaid", "theme_variables", "clusterBorder"): "设置 Mermaid 子图边框色。",
+    ("mermaid", "theme_variables", "edgeLabelBackground"): "设置 Mermaid 连线标签背景色。",
+    ("mermaid", "soft_max_height_ratio"): "软高度限制标记，当前暂无直接可见效果。",
+    ("mermaid", "hard_max_height_ratio"): "图高度超过页面可用高度该比例时会按比例缩小。",
+    ("mermaid", "page_max_height_ratio"): "页面布局模式下超大图允许使用的最大高度比例。",
+    ("mermaid", "page_break_threshold_ratio"): "首选高度超过该阈值时进入页面布局模式。",
+    ("mermaid", "min_readable_width"): "缩放后宽度低于该值时进入页面布局模式。",
+    ("mermaid", "oversized_strategy"): "设置超大 Mermaid 图采用页面布局还是仅缩放。",
+    ("mermaid", "force_page_break_before_oversized"): "控制页面布局模式下是否强制图前分页。",
+    ("mermaid", "keep_with_previous"): "控制小图是否允许与前一个短段落同页。",
+    ("mermaid", "keep_with_previous_max_chars"): "允许绑定上一段的最长字符数，小于等于 0 表示不限制。",
+    ("mermaid", "follow_previous_trigger_height_ratio"): "图高度不超过页面可用高度该比例时才尝试跟随前段。",
+    ("mermaid", "follow_previous_width_ratio"): "跟随前段时，图宽最多占页面可用宽度的比例。",
+    ("mermaid", "follow_previous_space_before"): "跟随前段时使用的图前间距。",
+    ("mermaid", "keep_together"): "设置 Mermaid 图段落的 Word keep-together。",
+    ("mermaid", "keep_with_next"): "设置 Mermaid 图段落与后一段保持在一起。",
+    ("mermaid", "widow_control"): "设置 Mermaid 图段落的 Word 孤行控制。",
+    ("chapter_scan", "target_dir"): "设置章节 Markdown 后置扫描的目标目录。",
+    ("chapter_scan", "glob"): "设置章节扫描文件匹配模式。",
+    ("chapter_scan", "recursive"): "控制章节扫描是否递归进入子目录。",
 }
 
 COLOR_FIELD_PATHS = {
@@ -310,9 +619,21 @@ def parse_mapped_widget_value(raw_value: Any, value_mapping: Tuple[Tuple[str, st
     return raw_value
 
 
+def resolve_section_label(path: ConfigPath, section_name: str) -> str:
+    """Return the display label for one config section or nested group."""
+    return SECTION_LABELS.get(path, section_name)
+
+
 def resolve_field_label(path: ConfigPath, field_name: str, _value: Any) -> str:
     """Return the display label for one editor field."""
-    return FIELD_LABELS.get(path, field_name)
+    return FIELD_LABELS.get(path, COMMON_FIELD_LABELS.get(field_name, field_name))
+
+
+def resolve_field_tip(path: ConfigPath, _value: Any) -> str:
+    """Return a concise help tip for one editor field."""
+    if not path:
+        return ""
+    return FIELD_TIPS.get(path, COMMON_FIELD_TIPS.get(path[-1], ""))
 
 
 def normalize_color_preview(raw_value: Any) -> Optional[str]:
@@ -481,6 +802,65 @@ def ask_external_change(*, parent: tk.Misc, path: Path) -> str:
     )
 
 
+class Tooltip:
+    """Small hover tooltip for Tk widgets."""
+
+    def __init__(self, widget: tk.Misc, text: str, delay_ms: int = 400) -> None:
+        self.widget = widget
+        self.text = text
+        self.delay_ms = delay_ms
+        self._after_id: Optional[str] = None
+        self._tip_window: Optional[tk.Toplevel] = None
+
+        self.widget.bind("<Enter>", self.schedule, add="+")
+        self.widget.bind("<Leave>", self.hide, add="+")
+        self.widget.bind("<ButtonPress>", self.hide, add="+")
+
+    def schedule(self, _event: Optional[tk.Event] = None) -> None:
+        """Show the tooltip after a short hover delay."""
+        self.cancel()
+        self._after_id = self.widget.after(self.delay_ms, self.show)
+
+    def cancel(self) -> None:
+        """Cancel a pending tooltip display."""
+        if self._after_id is None:
+            return
+        self.widget.after_cancel(self._after_id)
+        self._after_id = None
+
+    def show(self) -> None:
+        """Create the tooltip popup near the target widget."""
+        self._after_id = None
+        if self._tip_window is not None or not self.text:
+            return
+
+        x = self.widget.winfo_rootx() + 18
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 8
+        self._tip_window = tk.Toplevel(self.widget)
+        self._tip_window.wm_overrideredirect(True)
+        self._tip_window.wm_geometry(f"+{x}+{y}")
+
+        tk.Label(
+            self._tip_window,
+            text=self.text,
+            justify=tk.LEFT,
+            background="#FFF8DC",
+            relief=tk.SOLID,
+            borderwidth=1,
+            padx=8,
+            pady=5,
+            wraplength=360,
+        ).pack()
+
+    def hide(self, _event: Optional[tk.Event] = None) -> None:
+        """Hide the tooltip popup and cancel pending display."""
+        self.cancel()
+        if self._tip_window is None:
+            return
+        self._tip_window.destroy()
+        self._tip_window = None
+
+
 @dataclass
 class FieldBinding:
     """Keep a widget variable paired with its schema value."""
@@ -517,6 +897,7 @@ class ConfigEditorWindow:
         self.form_host: Optional[ttk.Frame] = None
         self.notebook: Optional[ttk.Notebook] = None
         self.field_bindings: List[FieldBinding] = []
+        self.tooltips: List[Tooltip] = []
         self.current_config = clone_config(self.document.draft_config)
         self.schema_config: Dict[str, Any] = {}
 
@@ -644,7 +1025,11 @@ class ConfigEditorWindow:
             self.notebook.add(tab_frame, text=tab_label)
 
             for index, section_key in enumerate(visible_keys):
-                section_frame = ttk.LabelFrame(body_frame, text=section_key, padding="10")
+                section_frame = ttk.LabelFrame(
+                    body_frame,
+                    text=resolve_section_label((section_key,), section_key),
+                    padding="10",
+                )
                 section_frame.grid(
                     row=index,
                     column=0,
@@ -663,9 +1048,10 @@ class ConfigEditorWindow:
         extra_keys = [key for key in self.current_config.keys() if key not in rendered_sections]
         for section_key in extra_keys:
             tab_frame, body_frame = self.create_scrollable_tab(self.notebook)
-            self.notebook.add(tab_frame, text=section_key)
+            section_label = resolve_section_label((section_key,), section_key)
+            self.notebook.add(tab_frame, text=section_label)
 
-            section_frame = ttk.LabelFrame(body_frame, text=section_key, padding="10")
+            section_frame = ttk.LabelFrame(body_frame, text=section_label, padding="10")
             section_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
             section_frame.columnconfigure(0, weight=1)
 
@@ -719,7 +1105,11 @@ class ConfigEditorWindow:
                 child_path = path + (key,)
 
                 if isinstance(value, dict):
-                    group = ttk.LabelFrame(parent, text=key, padding="10")
+                    group = ttk.LabelFrame(
+                        parent,
+                        text=resolve_section_label(child_path, key),
+                        padding="10",
+                    )
                     group.grid(row=index, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
                     group.columnconfigure(0, weight=1)
                     self.render_section_fields(group, value, child_schema, child_path)
@@ -727,26 +1117,51 @@ class ConfigEditorWindow:
 
                 row = ttk.Frame(parent)
                 row.grid(row=index, column=0, sticky=(tk.W, tk.E), pady=4)
-                row.columnconfigure(1, weight=1)
+                row.columnconfigure(2, weight=1)
 
                 label_text = resolve_field_label(child_path, key, value)
                 if child_schema is None:
                     label_text = f"{label_text} (留空 = null)"
 
                 ttk.Label(row, text=label_text, width=32).grid(row=0, column=0, sticky=tk.W, padx=(0, 8))
+                self.create_field_tip_widget(
+                    row,
+                    resolve_field_tip(child_path, value),
+                ).grid(row=0, column=1, sticky=tk.W, padx=(0, 8))
 
                 widget = self.create_field_widget(row, child_path, value, child_schema)
-                widget.grid(row=0, column=1, sticky=(tk.W, tk.E))
+                widget.grid(row=0, column=2, sticky=(tk.W, tk.E))
             return
 
         row = ttk.Frame(parent)
         row.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=4)
-        row.columnconfigure(1, weight=1)
+        row.columnconfigure(2, weight=1)
 
         label_text = resolve_field_label(path, path[-1], data)
         ttk.Label(row, text=label_text, width=32).grid(row=0, column=0, sticky=tk.W, padx=(0, 8))
+        self.create_field_tip_widget(row, resolve_field_tip(path, data)).grid(
+            row=0,
+            column=1,
+            sticky=tk.W,
+            padx=(0, 8),
+        )
         widget = self.create_field_widget(row, path, data, schema)
-        widget.grid(row=0, column=1, sticky=(tk.W, tk.E))
+        widget.grid(row=0, column=2, sticky=(tk.W, tk.E))
+
+    def create_field_tip_widget(self, parent: ttk.Frame, tip_text: str) -> ttk.Label:
+        """Create a visible field help marker with an attached tooltip."""
+        label_options = {
+            "text": "?" if tip_text else "",
+            "width": 2,
+            "anchor": tk.CENTER,
+        }
+        if tip_text:
+            label_options["cursor"] = "question_arrow"
+
+        label = ttk.Label(parent, **label_options)
+        if tip_text:
+            self.tooltips.append(Tooltip(label, tip_text))
+        return label
 
     def create_color_field_widget(
         self,
@@ -894,7 +1309,7 @@ class ConfigEditorWindow:
             parent=self.window,
             title="配置另存为",
             defaultextension=".yaml",
-            filetypes=[("YAML files", "*.yaml"), ("YML files", "*.yml"), ("All files", "*.*")],
+            filetypes=[("YAML 文件", "*.yaml"), ("YML 文件", "*.yml"), ("所有文件", "*.*")],
         )
 
         if not filename:
