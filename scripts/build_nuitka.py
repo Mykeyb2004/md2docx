@@ -171,31 +171,98 @@ def prepare_build(clean: bool, app_mode: bool) -> None:
     DIST_ROOT.mkdir(parents=True, exist_ok=True)
 
 
-def build_target(entry: str, mode: str, clean: bool) -> Path:
-    """Run Nuitka and return the built executable path."""
-    source_file = REPO_ROOT / "md2docx" / f"{entry}.py"
-    binary_name = f"md2docx-{entry}"
+def preflight_macos_app(launch: bool) -> None:
+    """Validate requirements for a local Apple Silicon app build."""
+    if sys.platform != "darwin":
+        raise RuntimeError("macOS app mode requires macOS")
+    if platform.machine() != "arm64":
+        raise RuntimeError("macOS app mode requires an arm64 Python")
+    for required in (REPO_ROOT / "md2docx" / "gui.py", DEFAULT_TEMPLATE):
+        if not required.is_file():
+            raise FileNotFoundError(f"required input is missing: {required}")
+    if importlib.util.find_spec("nuitka") is None:
+        raise RuntimeError("Nuitka is unavailable; run with --group build")
+    required_tools = ["file", "codesign"]
+    if launch:
+        required_tools.append("open")
+    missing_tools = [name for name in required_tools if shutil.which(name) is None]
+    if missing_tools:
+        raise RuntimeError(f"missing macOS tools: {', '.join(missing_tools)}")
+    for location in (BUILD_ROOT, LOG_DIR, DIST_ROOT):
+        if location.exists() and not location.is_dir():
+            raise RuntimeError(f"output location is not a directory: {location}")
 
-    if clean and OUTPUT_DIR.exists():
-        shutil.rmtree(OUTPUT_DIR)
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def initialize_build_log(log_path: Path) -> None:
+    """Start a fresh diagnostic log for one app pipeline run."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("md2docx macOS app build\n", encoding="utf-8")
 
-    command = [
-        sys.executable,
-        "-m",
-        "nuitka",
-        f"--mode={mode}",
-        "--assume-yes-for-downloads",
-        "--include-package-data=md2docx",
-        "--include-package=mistune.plugins",
-        "--output-dir=" + str(OUTPUT_DIR),
-        "--output-filename=" + binary_name,
-        str(source_file),
-    ]
 
-    if entry == "gui":
-        command.append("--enable-plugin=tk-inter")
+def report_worktree_state(log_path: Path) -> None:
+    """Report a dirty tree without blocking a local build."""
+    try:
+        result = subprocess.run(
+            ["git", "status", "--short"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        message = "Warning: unable to inspect Git worktree state."
+    else:
+        if result.returncode != 0:
+            message = "Warning: unable to inspect Git worktree state."
+        elif result.stdout.strip():
+            message = "Warning: Git worktree has uncommitted changes:\n" + result.stdout.rstrip()
+        else:
+            message = "Git worktree is clean."
+    print(message)
+    with log_path.open("a", encoding="utf-8") as log_file:
+        log_file.write(message + "\n")
+
+
+def run_logged(
+    command: Sequence[str],
+    log_path: Path,
+    env: Optional[Mapping[str, str]] = None,
+) -> None:
+    """Stream combined command output to the terminal and append it to a log."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as log_file:
+        rendered = shlex.join(list(command))
+        log_file.write(f"\n$ {rendered}\n")
+        log_file.flush()
+        process = subprocess.Popen(
+            list(command),
+            cwd=REPO_ROOT,
+            env=dict(env) if env is not None else None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        if process.stdout is None:
+            process.kill()
+            raise RuntimeError("unable to capture command output")
+        for line in process.stdout:
+            print(line, end="")
+            log_file.write(line)
+            log_file.flush()
+        return_code = process.wait()
+    if return_code != 0:
+        raise subprocess.CalledProcessError(return_code, list(command))
+
+
+def run_test_suite(log_path: Path) -> None:
+    """Run repository tests with the active uv-managed Python."""
+    run_logged([sys.executable, "-m", "pytest"], log_path)
+
+
+def build_target(entry: str, mode: str, log_path: Optional[Path] = None) -> Path:
+    """Run Nuitka and return the expected artifact path."""
+    command = build_nuitka_command(entry, mode)
 
     env = os.environ.copy()
     if sys.platform == "darwin":
@@ -204,13 +271,15 @@ def build_target(entry: str, mode: str, clean: bool) -> Path:
         if extra_flag not in ldflags:
             env["LDFLAGS"] = f"{ldflags} {extra_flag}".strip()
 
-    subprocess.run(command, check=True, cwd=REPO_ROOT, env=env)
+    if log_path is None:
+        subprocess.run(command, check=True, cwd=REPO_ROOT, env=env)
+    else:
+        run_logged(command, log_path, env=env)
 
-    target_name = executable_name(binary_name)
-    if mode == "onefile":
-        return OUTPUT_DIR / target_name
-
-    return OUTPUT_DIR / f"{binary_name}.dist" / target_name
+    target = expected_build_path(entry, mode)
+    if not target.exists():
+        raise FileNotFoundError(f"Nuitka did not create expected artifact: {target}")
+    return target
 
 
 def copy_editable_default_config(executable_path: Path) -> Path:
@@ -220,15 +289,17 @@ def copy_editable_default_config(executable_path: Path) -> Path:
     return target_path
 
 
-def main() -> None:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     """Build the requested target and place editable config beside it."""
-    args = parse_args()
-    executable_path = build_target(args.entry, args.mode, args.clean)
+    args = parse_args(argv)
+    prepare_build(args.clean, app_mode=False)
+    executable_path = build_target(args.entry, args.mode)
     config_path = copy_editable_default_config(executable_path)
 
     print(f"Built executable: {executable_path}")
     print(f"Editable config:  {config_path}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
