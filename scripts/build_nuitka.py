@@ -29,6 +29,8 @@ MACOS_STAGING_DIR = DIST_ROOT / "macos.staging"
 MACOS_BACKUP_DIR = DIST_ROOT / "macos.backup"
 MACOS_PRODUCT_NAME = "Md2docx"
 MACOS_APP_NAME = f"{MACOS_PRODUCT_NAME}.app"
+MACOS_EXECUTABLE_NAME = "md2docx-app"
+MACOS_BUILD_PYTHON_VERSION = (3, 11, 9)
 DEFAULT_TEMPLATE = REPO_ROOT / "md2docx" / "templates" / "default.yaml"
 KNOWN_REMOVABLE_DIRS: FrozenSet[Path] = frozenset(
     path.resolve()
@@ -113,7 +115,7 @@ def build_nuitka_command(entry: str, mode: str) -> list:
         raise ValueError("app mode supports only the gui entry point")
 
     source_file = REPO_ROOT / "md2docx" / f"{entry}.py"
-    binary_name = MACOS_PRODUCT_NAME if mode == "app" else f"md2docx-{entry}"
+    binary_name = MACOS_EXECUTABLE_NAME if mode == "app" else f"md2docx-{entry}"
     command = [sys.executable, "-m", "nuitka"]
     if mode == "app":
         command.extend(
@@ -177,6 +179,9 @@ def preflight_macos_app(launch: bool) -> None:
         raise RuntimeError("macOS app mode requires macOS")
     if platform.machine() != "arm64":
         raise RuntimeError("macOS app mode requires an arm64 Python")
+    if sys.version_info[:3] != MACOS_BUILD_PYTHON_VERSION:
+        required_version = ".".join(str(part) for part in MACOS_BUILD_PYTHON_VERSION)
+        raise RuntimeError(f"macOS app mode requires Python {required_version}")
     for required in (REPO_ROOT / "md2docx" / "gui.py", DEFAULT_TEMPLATE):
         if not required.is_file():
             raise FileNotFoundError(f"required input is missing: {required}")
