@@ -47,10 +47,18 @@ def test_app_command_creates_bundle_without_onefile():
     assert "--macos-create-app-bundle" in command
     assert "--macos-app-name=Md2docx" in command
     assert "--output-folder-name=Md2docx" in command
-    assert "--output-filename=Md2docx" in command
+    assert "--output-filename=md2docx-app" in command
     assert "--enable-plugin=tk-inter" in command
     assert "--mode=onefile" not in command
     assert "--mode=app" not in command
+
+
+def test_project_pins_reproducible_macos_build_python():
+    python_version = (build_nuitka.REPO_ROOT / ".python-version").read_text(
+        encoding="utf-8"
+    )
+
+    assert python_version.strip() == "3.11.9"
 
 
 @pytest.mark.parametrize(
@@ -104,6 +112,15 @@ def test_preflight_rejects_non_arm64_python(monkeypatch):
     monkeypatch.setattr(build_nuitka.platform, "machine", lambda: "x86_64")
 
     with pytest.raises(RuntimeError, match="requires an arm64 Python"):
+        build_nuitka.preflight_macos_app(launch=False)
+
+
+def test_preflight_rejects_unpinned_python_version(monkeypatch):
+    monkeypatch.setattr(build_nuitka.sys, "platform", "darwin")
+    monkeypatch.setattr(build_nuitka.platform, "machine", lambda: "arm64")
+    monkeypatch.setattr(build_nuitka.sys, "version_info", (3, 12, 11))
+
+    with pytest.raises(RuntimeError, match="requires Python 3.11.9"):
         build_nuitka.preflight_macos_app(launch=False)
 
 
