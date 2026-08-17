@@ -1831,6 +1831,15 @@ class Md2docxGUI:
             )
             return
 
+        output_path = Path(output_file)
+        if output_path.exists() and not messagebox.askyesno(
+            "Confirm Overwrite",
+            f"The output file already exists:\n{output_path}\n\nDo you want to overwrite it?",
+            parent=self.dialog_parent(),
+            default=messagebox.NO,
+        ):
+            return
+
         thread = threading.Thread(target=self._do_conversion, args=(input_file, output_file))
         thread.daemon = True
         thread.start()
@@ -1838,6 +1847,10 @@ class Md2docxGUI:
     def _do_conversion(self, input_file: str, output_file: str) -> None:
         """Perform actual conversion (runs in background thread)."""
         try:
+            self.root.after(
+                0,
+                lambda: self.progress.configure(mode="indeterminate", value=0),
+            )
             self.root.after(0, self.progress.start)
             self.root.after(0, lambda: self.status_var.set("Converting..."))
             config_data = self.build_effective_conversion_config()
@@ -1847,7 +1860,12 @@ class Md2docxGUI:
 
             self.add_to_history(input_file, output_file, "Success")
 
-            self.root.after(0, self.progress.stop)
+            def finish_progress() -> None:
+                self.progress.stop()
+                self.progress.configure(mode="determinate", value=100)
+                self.root.update_idletasks()
+
+            self.root.after(0, finish_progress)
             self.root.after(0, lambda: self.status_var.set(f"✓ Conversion successful: {output_file}"))
             self.root.after(
                 0,
