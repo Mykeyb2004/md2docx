@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
 import md2docx.gui as gui_module
 from md2docx.config_document import ConfigDocument
 from md2docx.config_utils import load_yaml_config
@@ -76,17 +78,26 @@ def _iter_leaf_config_paths(data, path=()):
 
 
 class _FakeProgress:
+    def __init__(self) -> None:
+        self.events = []
+
     def start(self) -> None:
-        pass
+        self.events.append(("start",))
 
     def stop(self) -> None:
-        pass
+        self.events.append(("stop",))
+
+    def configure(self, **kwargs) -> None:
+        self.events.append(("configure", kwargs))
 
 
 class _ImmediateRoot:
     def after(self, _delay_ms, callback=None) -> None:
         if callback:
             callback()
+
+    def update_idletasks(self) -> None:
+        pass
 
 
 class _PositionedWindow:
@@ -238,6 +249,59 @@ def test_main_validation_errors_are_parented_to_root(monkeypatch):
     gui.convert_file()
 
     assert captured["parent"] is root
+
+
+@pytest.mark.parametrize(
+    ("confirm_overwrite", "should_start"),
+    [(False, False), (True, True)],
+)
+def test_gui_confirms_before_overwriting_existing_output(
+    tmp_path: Path,
+    monkeypatch,
+    confirm_overwrite: bool,
+    should_start: bool,
+):
+    """An existing output should require explicit confirmation before conversion."""
+    input_path = tmp_path / "input.md"
+    output_path = tmp_path / "output.docx"
+    input_path.write_text("# Input\n", encoding="utf-8")
+    output_path.write_text("existing", encoding="utf-8")
+
+    root = object()
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.root = root
+    gui.input_var = _FakeStringVar(str(input_path))
+    gui.output_var = _FakeStringVar(str(output_path))
+    captured = {}
+
+    def askyesno(title, message, **kwargs):
+        captured["title"] = title
+        captured["message"] = message
+        captured.update(kwargs)
+        return confirm_overwrite
+
+    class FakeThread:
+        def __init__(self, *, target, args):
+            captured["thread_args"] = args
+            self.daemon = False
+
+        def start(self):
+            captured["started"] = True
+
+    monkeypatch.setattr(gui_module.messagebox, "askyesno", askyesno)
+    monkeypatch.setattr(gui_module.threading, "Thread", FakeThread)
+
+    gui.convert_file()
+
+    assert captured["title"] == "Confirm Overwrite"
+    assert str(output_path) in captured["message"]
+    assert captured["parent"] is root
+    assert captured["default"] == gui_module.messagebox.NO
+    assert captured.get("started", False) is should_start
+    if should_start:
+        assert captured["thread_args"] == (str(input_path), str(output_path))
+    else:
+        assert "thread_args" not in captured
 
 
 def test_gui_defaults_to_packaged_template_when_no_config_preference(tmp_path: Path):
@@ -424,6 +488,12 @@ def test_gui_conversion_uses_saved_config_not_dirty_draft(monkeypatch):
     assert captured["config_data"]["table"]["layout"] == "accent_grid"
     assert captured["config_data"]["document"]["auto_fix_tables"] is True
     assert captured["convert"] == ("input.md", "output.docx")
+    assert gui.progress.events == [
+        ("configure", {"mode": "indeterminate", "value": 0}),
+        ("start",),
+        ("stop",),
+        ("configure", {"mode": "determinate", "value": 100}),
+    ]
 
 
 def test_gui_close_preserves_root_when_editor_close_is_cancelled():
