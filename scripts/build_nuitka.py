@@ -395,6 +395,78 @@ def promote_macos_app(
     return final_dir / MACOS_APP_NAME
 
 
+def run_stage(stage: str, action: Callable[[], T]) -> T:
+    """Run one stage and attach its name to any failure."""
+    try:
+        return action()
+    except BuildPipelineError:
+        raise
+    except Exception as exc:
+        raise BuildPipelineError(stage, str(exc)) from exc
+
+
+def launch_macos_app(app_path: Path) -> None:
+    """Open a promoted app only when explicitly requested."""
+    subprocess.run(["open", str(app_path)], cwd=REPO_ROOT, check=True)
+
+
+def run_macos_app_pipeline(args: argparse.Namespace) -> BuildResult:
+    """Build, verify, publish, and optionally launch the macOS app."""
+    started = time.monotonic()
+    run_stage("preflight", lambda: preflight_macos_app(args.launch))
+    run_stage("logging", lambda: initialize_build_log(BUILD_LOG))
+    run_stage("logging", lambda: report_worktree_state(BUILD_LOG))
+    if not args.skip_tests:
+        run_stage("tests", lambda: run_test_suite(BUILD_LOG))
+    run_stage("preparation", lambda: prepare_build(args.clean, app_mode=True))
+    built_app = run_stage(
+        "compilation",
+        lambda: build_target("gui", "app", BUILD_LOG),
+    )
+    staged_app = run_stage("staging", lambda: stage_macos_app(built_app))
+
+    def sign_and_verify() -> None:
+        sign_macos_app(staged_app)
+        verify_macos_app(staged_app)
+
+    run_stage("verification", sign_and_verify)
+    final_app = run_stage("promotion", promote_macos_app)
+    if args.launch:
+        run_stage("launch", lambda: launch_macos_app(final_app))
+    return BuildResult(
+        app_path=final_app,
+        config_path=final_app.parent / "default.yaml",
+        log_path=BUILD_LOG,
+        elapsed_seconds=time.monotonic() - started,
+        tests_ran=not args.skip_tests,
+        cleaned=args.clean,
+        launched=args.launch,
+    )
+
+
+def directory_size(path: Path) -> int:
+    """Return the byte size of regular files inside a directory."""
+    return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+
+
+def format_megabytes(byte_count: int) -> str:
+    """Format bytes for the human-readable build summary."""
+    return f"{byte_count / (1024 * 1024):.1f} MiB"
+
+
+def print_app_summary(result: BuildResult) -> None:
+    """Print paths and choices for a successful pipeline run."""
+    print("macOS app build succeeded")
+    print(f"Application:      {result.app_path}")
+    print(f"Editable config:  {result.config_path}")
+    print(f"Diagnostics:      {result.log_path}")
+    print(f"Application size: {format_megabytes(directory_size(result.app_path))}")
+    print(f"Elapsed time:     {result.elapsed_seconds:.1f}s")
+    print(f"Tests:            {'ran' if result.tests_ran else 'skipped'}")
+    print(f"Clean build:      {'yes' if result.cleaned else 'no'}")
+    print(f"Launched:         {'yes' if result.launched else 'no'}")
+
+
 def copy_editable_default_config(executable_path: Path) -> Path:
     """Copy the editable default config beside the built executable."""
     target_path = executable_path.parent / "default.yaml"
@@ -403,11 +475,29 @@ def copy_editable_default_config(executable_path: Path) -> Path:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """Build the requested target and place editable config beside it."""
+    """Build the requested target and return a process exit code."""
     args = parse_args(argv)
-    prepare_build(args.clean, app_mode=False)
-    executable_path = build_target(args.entry, args.mode)
-    config_path = copy_editable_default_config(executable_path)
+    try:
+        if args.mode == "app":
+            result = run_macos_app_pipeline(args)
+            print_app_summary(result)
+            return 0
+
+        run_stage(
+            "preparation",
+            lambda: prepare_build(args.clean, app_mode=False),
+        )
+        executable_path = run_stage(
+            "compilation",
+            lambda: build_target(args.entry, args.mode),
+        )
+        config_path = run_stage(
+            "staging",
+            lambda: copy_editable_default_config(executable_path),
+        )
+    except BuildPipelineError as exc:
+        print(f"Build failed: {exc}", file=sys.stderr)
+        return 1
 
     print(f"Built executable: {executable_path}")
     print(f"Editable config:  {config_path}")

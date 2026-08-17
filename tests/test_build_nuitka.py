@@ -397,3 +397,205 @@ def test_promote_macos_app_restores_previous_release_on_rename_failure(
         build_nuitka.promote_macos_app(staging_dir, final_dir, backup_dir)
 
     assert (final_dir / "old.txt").read_text(encoding="utf-8") == "keep"
+
+
+def app_args(**overrides):
+    values = {
+        "entry": "gui",
+        "mode": "app",
+        "clean": False,
+        "skip_tests": False,
+        "launch": False,
+    }
+    values.update(overrides)
+    return argparse.Namespace(**values)
+
+
+def test_app_pipeline_runs_stages_in_order_without_default_launch(tmp_path, monkeypatch):
+    events = []
+    built_app = tmp_path / "build" / build_nuitka.MACOS_APP_NAME
+    staged_app = tmp_path / "staging" / build_nuitka.MACOS_APP_NAME
+    final_app = tmp_path / "macos" / build_nuitka.MACOS_APP_NAME
+    monkeypatch.setattr(build_nuitka, "BUILD_LOG", tmp_path / "build.log")
+    monkeypatch.setattr(build_nuitka, "preflight_macos_app", lambda launch: events.append("preflight"))
+    monkeypatch.setattr(build_nuitka, "initialize_build_log", lambda path: events.append("log"))
+    monkeypatch.setattr(build_nuitka, "report_worktree_state", lambda path: events.append("git"))
+    monkeypatch.setattr(build_nuitka, "run_test_suite", lambda path: events.append("tests"))
+    monkeypatch.setattr(
+        build_nuitka, "prepare_build", lambda clean, app_mode: events.append("prepare")
+    )
+
+    def fake_build(entry, mode, log_path):
+        events.append("compile")
+        return built_app
+
+    def fake_stage(app):
+        events.append("stage")
+        return staged_app
+
+    monkeypatch.setattr(build_nuitka, "build_target", fake_build)
+    monkeypatch.setattr(build_nuitka, "stage_macos_app", fake_stage)
+    monkeypatch.setattr(build_nuitka, "sign_macos_app", lambda app: events.append("sign"))
+    monkeypatch.setattr(build_nuitka, "verify_macos_app", lambda app: events.append("verify"))
+    monkeypatch.setattr(
+        build_nuitka,
+        "promote_macos_app",
+        lambda: events.append("promote") or final_app,
+    )
+    monkeypatch.setattr(build_nuitka, "launch_macos_app", lambda app: events.append("launch"))
+
+    result = build_nuitka.run_macos_app_pipeline(app_args())
+
+    assert events == [
+        "preflight", "log", "git", "tests", "prepare", "compile",
+        "stage", "sign", "verify", "promote",
+    ]
+    assert result.app_path == final_app
+    assert result.tests_ran is True
+    assert result.launched is False
+
+
+def test_app_pipeline_skips_tests_and_launches_only_after_promotion(tmp_path, monkeypatch):
+    events = []
+    candidate = tmp_path / "staging" / build_nuitka.MACOS_APP_NAME
+    final_app = tmp_path / "macos" / build_nuitka.MACOS_APP_NAME
+    monkeypatch.setattr(build_nuitka, "BUILD_LOG", tmp_path / "build.log")
+    monkeypatch.setattr(build_nuitka, "preflight_macos_app", lambda launch: None)
+    monkeypatch.setattr(build_nuitka, "initialize_build_log", lambda path: None)
+    monkeypatch.setattr(build_nuitka, "report_worktree_state", lambda path: None)
+    monkeypatch.setattr(
+        build_nuitka,
+        "run_test_suite",
+        lambda path: pytest.fail("tests must be skipped"),
+    )
+    monkeypatch.setattr(build_nuitka, "prepare_build", lambda clean, app_mode: None)
+    monkeypatch.setattr(build_nuitka, "build_target", lambda entry, mode, log: candidate)
+    monkeypatch.setattr(build_nuitka, "stage_macos_app", lambda app: candidate)
+    monkeypatch.setattr(build_nuitka, "sign_macos_app", lambda app: None)
+    monkeypatch.setattr(build_nuitka, "verify_macos_app", lambda app: None)
+    monkeypatch.setattr(
+        build_nuitka,
+        "promote_macos_app",
+        lambda: events.append("promote") or final_app,
+    )
+    monkeypatch.setattr(
+        build_nuitka,
+        "launch_macos_app",
+        lambda app: events.append("launch"),
+    )
+
+    result = build_nuitka.run_macos_app_pipeline(
+        app_args(skip_tests=True, launch=True)
+    )
+
+    assert events == ["promote", "launch"]
+    assert result.tests_ran is False
+    assert result.launched is True
+
+
+@pytest.mark.parametrize(
+    ("failing_function", "expected_events", "expected_stage"),
+    [
+        ("stage_macos_app", [], "staging failed"),
+        ("verify_macos_app", ["sign"], "verification failed"),
+    ],
+)
+def test_app_pipeline_never_promotes_after_candidate_failure(
+    tmp_path, monkeypatch, failing_function, expected_events, expected_stage
+):
+    events = []
+    monkeypatch.setattr(build_nuitka, "BUILD_LOG", tmp_path / "build.log")
+    monkeypatch.setattr(build_nuitka, "preflight_macos_app", lambda launch: None)
+    monkeypatch.setattr(build_nuitka, "initialize_build_log", lambda path: None)
+    monkeypatch.setattr(build_nuitka, "report_worktree_state", lambda path: None)
+    monkeypatch.setattr(build_nuitka, "run_test_suite", lambda path: None)
+    monkeypatch.setattr(build_nuitka, "prepare_build", lambda clean, app_mode: None)
+    monkeypatch.setattr(
+        build_nuitka,
+        "build_target",
+        lambda entry, mode, log: tmp_path / "built" / build_nuitka.MACOS_APP_NAME,
+    )
+    monkeypatch.setattr(
+        build_nuitka,
+        "stage_macos_app",
+        lambda app: tmp_path / "staging" / build_nuitka.MACOS_APP_NAME,
+    )
+    monkeypatch.setattr(build_nuitka, "sign_macos_app", lambda app: events.append("sign"))
+    monkeypatch.setattr(build_nuitka, "verify_macos_app", lambda app: None)
+
+    def fail_candidate(app):
+        raise RuntimeError("candidate is invalid")
+
+    monkeypatch.setattr(build_nuitka, failing_function, fail_candidate)
+    monkeypatch.setattr(
+        build_nuitka,
+        "promote_macos_app",
+        lambda: events.append("promote"),
+    )
+
+    with pytest.raises(build_nuitka.BuildPipelineError, match=expected_stage):
+        build_nuitka.run_macos_app_pipeline(app_args())
+
+    assert events == expected_events
+
+
+def test_run_stage_labels_failures():
+    def fail():
+        raise OSError("disk full")
+
+    with pytest.raises(
+        build_nuitka.BuildPipelineError,
+        match="staging failed: disk full",
+    ):
+        build_nuitka.run_stage("staging", fail)
+
+
+def test_launch_macos_app_uses_open(tmp_path, monkeypatch):
+    app_path = tmp_path / build_nuitka.MACOS_APP_NAME
+    calls = []
+    monkeypatch.setattr(
+        build_nuitka.subprocess,
+        "run",
+        lambda command, **kwargs: calls.append((command, kwargs)),
+    )
+
+    build_nuitka.launch_macos_app(app_path)
+
+    assert calls == [(["open", str(app_path)], {"cwd": build_nuitka.REPO_ROOT, "check": True})]
+
+
+def test_print_app_summary_reports_paths_and_size(tmp_path, capsys):
+    app_path = tmp_path / build_nuitka.MACOS_APP_NAME
+    app_path.mkdir()
+    (app_path / "payload.bin").write_bytes(b"x" * 1024)
+    result = build_nuitka.BuildResult(
+        app_path=app_path,
+        config_path=tmp_path / "default.yaml",
+        log_path=tmp_path / "build.log",
+        elapsed_seconds=1.25,
+        tests_ran=True,
+        cleaned=True,
+        launched=False,
+    )
+
+    build_nuitka.print_app_summary(result)
+
+    output = capsys.readouterr().out
+    assert "macOS app build succeeded" in output
+    assert str(app_path) in output
+    assert "0.0 MiB" in output
+    assert "Elapsed time:     1.2s" in output
+
+
+def test_main_returns_nonzero_and_names_failed_stage(monkeypatch, capsys):
+    monkeypatch.setattr(build_nuitka, "parse_args", lambda argv=None: app_args())
+
+    def fail_pipeline(args):
+        raise build_nuitka.BuildPipelineError("tests", "pytest exited 1")
+
+    monkeypatch.setattr(build_nuitka, "run_macos_app_pipeline", fail_pipeline)
+
+    result = build_nuitka.main([])
+
+    assert result == 1
+    assert "Build failed: tests failed: pytest exited 1" in capsys.readouterr().err
