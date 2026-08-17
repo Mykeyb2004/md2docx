@@ -282,6 +282,119 @@ def build_target(entry: str, mode: str, log_path: Optional[Path] = None) -> Path
     return target
 
 
+def stage_macos_app(
+    built_app: Path,
+    staging_dir: Path = MACOS_STAGING_DIR,
+    template: Path = DEFAULT_TEMPLATE,
+) -> Path:
+    """Copy a built app and editable example config into candidate staging."""
+    if staging_dir.exists():
+        raise FileExistsError(f"staging directory already exists: {staging_dir}")
+    staging_dir.mkdir(parents=True)
+    staged_app = staging_dir / MACOS_APP_NAME
+    shutil.copytree(built_app, staged_app, symlinks=True)
+    shutil.copy2(template, staging_dir / "default.yaml")
+    return staged_app
+
+
+def sign_macos_app(app_path: Path) -> None:
+    """Refresh the candidate bundle's local ad-hoc signature."""
+    subprocess.run(
+        ["codesign", "--force", "--deep", "--sign", "-", str(app_path)],
+        cwd=REPO_ROOT,
+        check=True,
+    )
+
+
+def verify_macos_app(app_path: Path) -> Path:
+    """Verify bundle structure, architecture, resources, and signature."""
+    info_plist = app_path / "Contents" / "Info.plist"
+    if not info_plist.is_file():
+        raise RuntimeError(f"missing bundle Info.plist: {info_plist}")
+    with info_plist.open("rb") as plist_file:
+        bundle_info = plistlib.load(plist_file)
+    executable_name_value = bundle_info.get("CFBundleExecutable")
+    if not isinstance(executable_name_value, str) or not executable_name_value:
+        raise RuntimeError("Info.plist has no valid CFBundleExecutable")
+    executable = app_path / "Contents" / "MacOS" / executable_name_value
+    if not executable.is_file():
+        raise RuntimeError(f"bundle executable is missing: {executable}")
+
+    file_result = subprocess.run(
+        ["file", str(executable)],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    architecture_text = f"{file_result.stdout}\n{file_result.stderr}"
+    if "arm64" not in architecture_text:
+        raise RuntimeError(
+            f"bundle executable does not contain arm64: {architecture_text.strip()}"
+        )
+
+    packaged_template = any(
+        path.is_file()
+        and tuple(path.parts[-3:]) == ("md2docx", "templates", "default.yaml")
+        for path in app_path.rglob("default.yaml")
+    )
+    if not packaged_template:
+        raise RuntimeError("bundle is missing packaged md2docx template")
+    has_tcl = any(
+        path.is_file() and path.parent.name.startswith("tcl")
+        for path in app_path.rglob("init.tcl")
+    )
+    has_tk = any(
+        path.is_file() and path.parent.name.startswith("tk")
+        for path in app_path.rglob("tk.tcl")
+    )
+    if not has_tcl:
+        raise RuntimeError("bundle is missing Tcl runtime")
+    if not has_tk:
+        raise RuntimeError("bundle is missing Tk runtime")
+
+    subprocess.run(
+        ["codesign", "--verify", "--deep", "--strict", str(app_path)],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return executable
+
+
+def promote_macos_app(
+    staging_dir: Path = MACOS_STAGING_DIR,
+    final_dir: Path = MACOS_DIST_DIR,
+    backup_dir: Path = MACOS_BACKUP_DIR,
+) -> Path:
+    """Publish a verified candidate and preserve the old release on failure."""
+    candidate_app = staging_dir / MACOS_APP_NAME
+    if not candidate_app.is_dir():
+        raise RuntimeError(f"verified candidate app is missing: {candidate_app}")
+    final_dir.parent.mkdir(parents=True, exist_ok=True)
+
+    if backup_dir.exists():
+        if final_dir.exists():
+            remove_known_directory(backup_dir)
+        else:
+            os.replace(backup_dir, final_dir)
+
+    moved_previous = False
+    if final_dir.exists():
+        os.replace(final_dir, backup_dir)
+        moved_previous = True
+    try:
+        os.replace(staging_dir, final_dir)
+    except OSError:
+        if moved_previous and backup_dir.exists() and not final_dir.exists():
+            os.replace(backup_dir, final_dir)
+        raise
+    if backup_dir.exists():
+        remove_known_directory(backup_dir)
+    return final_dir / MACOS_APP_NAME
+
+
 def copy_editable_default_config(executable_path: Path) -> Path:
     """Copy the editable default config beside the built executable."""
     target_path = executable_path.parent / "default.yaml"
