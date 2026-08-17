@@ -214,3 +214,186 @@ def test_main_preserves_legacy_build_flow(monkeypatch, tmp_path):
         ("build", "gui", "onefile"),
         ("config", executable),
     ]
+
+
+def make_fake_app(root: Path) -> Path:
+    app_path = root / build_nuitka.MACOS_APP_NAME
+    contents = app_path / "Contents"
+    executable = contents / "MacOS" / build_nuitka.MACOS_PRODUCT_NAME
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"fake Mach-O")
+    executable.chmod(0o755)
+    resources = contents / "Resources"
+    (resources / "md2docx" / "templates").mkdir(parents=True)
+    (resources / "md2docx" / "templates" / "default.yaml").write_text(
+        "paragraph: {}\n", encoding="utf-8"
+    )
+    (resources / "tcl8.6").mkdir()
+    (resources / "tcl8.6" / "init.tcl").write_text("# tcl\n", encoding="utf-8")
+    (resources / "tk8.6").mkdir()
+    (resources / "tk8.6" / "tk.tcl").write_text("# tk\n", encoding="utf-8")
+    with (contents / "Info.plist").open("wb") as plist_file:
+        plistlib.dump({"CFBundleExecutable": build_nuitka.MACOS_PRODUCT_NAME}, plist_file)
+    return app_path
+
+
+def test_stage_macos_app_copies_bundle_and_editable_config(tmp_path):
+    built_app = make_fake_app(tmp_path / "build")
+    template = tmp_path / "default.yaml"
+    template.write_text("paragraph: {}\n", encoding="utf-8")
+    staging = tmp_path / "macos.staging"
+
+    staged_app = build_nuitka.stage_macos_app(built_app, staging, template)
+
+    assert staged_app == staging / build_nuitka.MACOS_APP_NAME
+    assert (staged_app / "Contents" / "Info.plist").is_file()
+    assert (staging / "default.yaml").read_text(encoding="utf-8") == "paragraph: {}\n"
+
+
+def test_verify_macos_app_accepts_complete_arm64_bundle(tmp_path, monkeypatch):
+    app_path = make_fake_app(tmp_path)
+
+    def fake_run(command, **kwargs):
+        if command[0] == "file":
+            return subprocess.CompletedProcess(command, 0, "Mach-O 64-bit executable arm64\n", "")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(build_nuitka.subprocess, "run", fake_run)
+
+    executable = build_nuitka.verify_macos_app(app_path)
+
+    assert executable == app_path / "Contents" / "MacOS" / "Md2docx"
+
+
+def test_verify_macos_app_rejects_missing_info_plist(tmp_path):
+    app_path = tmp_path / build_nuitka.MACOS_APP_NAME
+    app_path.mkdir()
+
+    with pytest.raises(RuntimeError, match="Info.plist"):
+        build_nuitka.verify_macos_app(app_path)
+
+
+def test_verify_macos_app_rejects_wrong_architecture(tmp_path, monkeypatch):
+    app_path = make_fake_app(tmp_path)
+    monkeypatch.setattr(
+        build_nuitka.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 0, "Mach-O 64-bit executable x86_64\n", ""
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="does not contain arm64"):
+        build_nuitka.verify_macos_app(app_path)
+
+
+def test_verify_macos_app_rejects_missing_packaged_template(tmp_path, monkeypatch):
+    app_path = make_fake_app(tmp_path)
+    (app_path / "Contents" / "Resources" / "md2docx" / "templates" / "default.yaml").unlink()
+    monkeypatch.setattr(
+        build_nuitka.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 0, "Mach-O 64-bit executable arm64\n", ""
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="packaged md2docx template"):
+        build_nuitka.verify_macos_app(app_path)
+
+
+def test_verify_macos_app_rejects_missing_tk_resources(tmp_path, monkeypatch):
+    app_path = make_fake_app(tmp_path)
+    (app_path / "Contents" / "Resources" / "tk8.6" / "tk.tcl").unlink()
+    monkeypatch.setattr(
+        build_nuitka.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 0, "Mach-O 64-bit executable arm64\n", ""
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="Tk runtime"):
+        build_nuitka.verify_macos_app(app_path)
+
+
+def test_verify_macos_app_propagates_invalid_signature(tmp_path, monkeypatch):
+    app_path = make_fake_app(tmp_path)
+
+    def fake_run(command, **kwargs):
+        if command[0] == "file":
+            return subprocess.CompletedProcess(command, 0, "Mach-O 64-bit executable arm64\n", "")
+        raise subprocess.CalledProcessError(1, command, stderr="invalid signature")
+
+    monkeypatch.setattr(build_nuitka.subprocess, "run", fake_run)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        build_nuitka.verify_macos_app(app_path)
+
+
+def test_sign_macos_app_uses_ad_hoc_identity(tmp_path, monkeypatch):
+    app_path = make_fake_app(tmp_path)
+    calls = []
+    monkeypatch.setattr(
+        build_nuitka.subprocess,
+        "run",
+        lambda command, **kwargs: calls.append((command, kwargs)),
+    )
+
+    build_nuitka.sign_macos_app(app_path)
+
+    assert calls[0][0] == [
+        "codesign", "--force", "--deep", "--sign", "-", str(app_path)
+    ]
+    assert calls[0][1]["check"] is True
+
+
+def test_promote_macos_app_replaces_verified_release(tmp_path, monkeypatch):
+    final_dir = tmp_path / "macos"
+    staging_dir = tmp_path / "macos.staging"
+    backup_dir = tmp_path / "macos.backup"
+    final_dir.mkdir()
+    (final_dir / "old.txt").write_text("old", encoding="utf-8")
+    make_fake_app(staging_dir)
+    (staging_dir / "default.yaml").write_text("new\n", encoding="utf-8")
+    monkeypatch.setattr(
+        build_nuitka,
+        "KNOWN_REMOVABLE_DIRS",
+        frozenset({backup_dir.resolve()}),
+    )
+
+    app_path = build_nuitka.promote_macos_app(staging_dir, final_dir, backup_dir)
+
+    assert app_path == final_dir / build_nuitka.MACOS_APP_NAME
+    assert app_path.is_dir()
+    assert not (final_dir / "old.txt").exists()
+    assert not backup_dir.exists()
+
+
+def test_promote_macos_app_restores_previous_release_on_rename_failure(
+    tmp_path, monkeypatch
+):
+    final_dir = tmp_path / "macos"
+    staging_dir = tmp_path / "macos.staging"
+    backup_dir = tmp_path / "macos.backup"
+    final_dir.mkdir()
+    (final_dir / "old.txt").write_text("keep", encoding="utf-8")
+    make_fake_app(staging_dir)
+    monkeypatch.setattr(
+        build_nuitka,
+        "KNOWN_REMOVABLE_DIRS",
+        frozenset({backup_dir.resolve()}),
+    )
+    real_replace = os.replace
+
+    def fail_candidate_move(source, destination):
+        if Path(source) == staging_dir:
+            raise OSError("simulated promotion failure")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(build_nuitka.os, "replace", fail_candidate_move)
+
+    with pytest.raises(OSError, match="simulated promotion failure"):
+        build_nuitka.promote_macos_app(staging_dir, final_dir, backup_dir)
+
+    assert (final_dir / "old.txt").read_text(encoding="utf-8") == "keep"
