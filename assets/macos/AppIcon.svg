@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="background" x1="32" y1="20" x2="224" y2="238" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#78C1FF"/>
+      <stop offset=".52" stop-color="#398AF0"/>
+      <stop offset="1" stop-color="#175FCB"/>
+    </linearGradient>
+    <linearGradient id="source" x1="54" y1="54" x2="173" y2="198" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DCEBFF"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#background)"/>
+  <path d="M48 63c0-9 7-16 16-16h66l30 30v73c0 9-7 16-16 16H64c-9 0-16-7-16-16V63Z" fill="url(#source)"/>
+  <path d="M130 47v23c0 8 6 14 14 14h16" fill="#BAD8FF"/>
+  <path d="M70 92h49M70 111h58M70 130h38" stroke="#397DD5" stroke-width="8" stroke-linecap="round" opacity=".68"/>
+  <path d="M125 108c10-8 20-12 31-12" fill="none" stroke="#164B9C" stroke-width="11" stroke-linecap="round"/>
+  <path d="m151 84 15 10-13 14" fill="none" stroke="#164B9C" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M119 112c0-9 7-16 16-16h48l26 26v69c0 9-7 16-16 16h-58c-9 0-16-7-16-16v-79Z" fill="#F8FBFF" stroke="#2F75D2" stroke-width="5"/>
+  <path d="M183 96v19c0 8 6 14 14 14h12" fill="#B9D8FF"/>
+  <path d="M142 145h42M142 163h42M142 181h29" stroke="#347BD6" stroke-width="8" stroke-linecap="round"/>
+</svg>

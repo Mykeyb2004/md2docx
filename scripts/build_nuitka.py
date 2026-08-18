@@ -32,6 +32,7 @@ MACOS_APP_NAME = f"{MACOS_PRODUCT_NAME}.app"
 MACOS_EXECUTABLE_NAME = "md2docx-app"
 MACOS_BUILD_PYTHON_VERSION = (3, 11, 9)
 DEFAULT_TEMPLATE = REPO_ROOT / "md2docx" / "templates" / "default.yaml"
+MACOS_APP_ICON = REPO_ROOT / "assets" / "macos" / "AppIcon.icns"
 KNOWN_REMOVABLE_DIRS: FrozenSet[Path] = frozenset(
     path.resolve()
     for path in (OUTPUT_DIR, MACOS_STAGING_DIR, MACOS_BACKUP_DIR)
@@ -122,6 +123,7 @@ def build_nuitka_command(entry: str, mode: str) -> list:
             [
                 "--macos-create-app-bundle",
                 f"--macos-app-name={MACOS_PRODUCT_NAME}",
+                f"--macos-app-icon={MACOS_APP_ICON}",
                 f"--output-folder-name={MACOS_PRODUCT_NAME}",
             ]
         )
@@ -182,9 +184,13 @@ def preflight_macos_app(launch: bool) -> None:
     if sys.version_info[:3] != MACOS_BUILD_PYTHON_VERSION:
         required_version = ".".join(str(part) for part in MACOS_BUILD_PYTHON_VERSION)
         raise RuntimeError(f"macOS app mode requires Python {required_version}")
-    for required in (REPO_ROOT / "md2docx" / "gui.py", DEFAULT_TEMPLATE):
-        if not required.is_file():
-            raise FileNotFoundError(f"required input is missing: {required}")
+    for required in (
+        REPO_ROOT / "md2docx" / "gui.py",
+        DEFAULT_TEMPLATE,
+        MACOS_APP_ICON,
+    ):
+        if not required.is_file() or required.stat().st_size == 0:
+            raise FileNotFoundError(f"required input is missing or empty: {required}")
     if importlib.util.find_spec("nuitka") is None:
         raise RuntimeError("Nuitka is unavailable; run with --group build")
     required_tools = ["file", "codesign"]
@@ -318,6 +324,15 @@ def verify_macos_app(app_path: Path) -> Path:
         raise RuntimeError(f"missing bundle Info.plist: {info_plist}")
     with info_plist.open("rb") as plist_file:
         bundle_info = plistlib.load(plist_file)
+    icon_value = bundle_info.get("CFBundleIconFile")
+    if not isinstance(icon_value, str) or not icon_value:
+        raise RuntimeError("Info.plist has no valid CFBundleIconFile")
+    icon_name = Path(icon_value).name
+    if not icon_name.endswith(".icns"):
+        icon_name = f"{icon_name}.icns"
+    icon_resource = app_path / "Contents" / "Resources" / icon_name
+    if not icon_resource.is_file() or icon_resource.stat().st_size == 0:
+        raise RuntimeError(f"bundle is missing app icon resource: {icon_resource}")
     executable_name_value = bundle_info.get("CFBundleExecutable")
     if not isinstance(executable_name_value, str) or not executable_name_value:
         raise RuntimeError("Info.plist has no valid CFBundleExecutable")

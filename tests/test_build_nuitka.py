@@ -53,6 +53,19 @@ def test_app_command_creates_bundle_without_onefile():
     assert "--mode=app" not in command
 
 
+def test_app_command_includes_committed_icon_path():
+    command = build_nuitka.build_nuitka_command("gui", "app")
+
+    assert f"--macos-app-icon={build_nuitka.MACOS_APP_ICON}" in command
+
+
+def test_legacy_commands_do_not_include_macos_app_icon():
+    for mode in ("onefile", "standalone"):
+        command = build_nuitka.build_nuitka_command("gui", mode)
+
+        assert not any(argument.startswith("--macos-app-icon=") for argument in command)
+
+
 def test_project_pins_reproducible_macos_build_python():
     python_version = (build_nuitka.REPO_ROOT / ".python-version").read_text(
         encoding="utf-8"
@@ -121,6 +134,21 @@ def test_preflight_rejects_unpinned_python_version(monkeypatch):
     monkeypatch.setattr(build_nuitka.sys, "version_info", (3, 12, 11))
 
     with pytest.raises(RuntimeError, match="requires Python 3.11.9"):
+        build_nuitka.preflight_macos_app(launch=False)
+
+
+def test_preflight_rejects_missing_app_icon(monkeypatch, tmp_path):
+    monkeypatch.setattr(build_nuitka.sys, "platform", "darwin")
+    monkeypatch.setattr(build_nuitka.platform, "machine", lambda: "arm64")
+    monkeypatch.setattr(build_nuitka.sys, "version_info", (3, 11, 9))
+    monkeypatch.setattr(build_nuitka.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(build_nuitka.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(build_nuitka, "MACOS_APP_ICON", tmp_path / "missing.icns")
+    monkeypatch.setattr(build_nuitka, "BUILD_ROOT", tmp_path / "build")
+    monkeypatch.setattr(build_nuitka, "LOG_DIR", tmp_path / "logs")
+    monkeypatch.setattr(build_nuitka, "DIST_ROOT", tmp_path / "dist")
+
+    with pytest.raises(FileNotFoundError, match="AppIcon.icns|missing.icns"):
         build_nuitka.preflight_macos_app(launch=False)
 
 
@@ -249,8 +277,16 @@ def make_fake_app(root: Path) -> Path:
     (resources / "tcl8.6" / "init.tcl").write_text("# tcl\n", encoding="utf-8")
     (resources / "tk8.6").mkdir()
     (resources / "tk8.6" / "tk.tcl").write_text("# tk\n", encoding="utf-8")
+    icon_name = "AppIcon.icns"
+    (resources / icon_name).write_bytes(b"fake icns")
     with (contents / "Info.plist").open("wb") as plist_file:
-        plistlib.dump({"CFBundleExecutable": build_nuitka.MACOS_PRODUCT_NAME}, plist_file)
+        plistlib.dump(
+            {
+                "CFBundleExecutable": build_nuitka.MACOS_PRODUCT_NAME,
+                "CFBundleIconFile": icon_name,
+            },
+            plist_file,
+        )
     return app_path
 
 
@@ -287,6 +323,41 @@ def test_verify_macos_app_rejects_missing_info_plist(tmp_path):
     app_path.mkdir()
 
     with pytest.raises(RuntimeError, match="Info.plist"):
+        build_nuitka.verify_macos_app(app_path)
+
+
+def test_verify_macos_app_rejects_missing_icon_declaration(tmp_path, monkeypatch):
+    app_path = make_fake_app(tmp_path)
+    plist_path = app_path / "Contents" / "Info.plist"
+    with plist_path.open("rb") as plist_file:
+        bundle_info = plistlib.load(plist_file)
+    bundle_info.pop("CFBundleIconFile")
+    with plist_path.open("wb") as plist_file:
+        plistlib.dump(bundle_info, plist_file)
+    monkeypatch.setattr(
+        build_nuitka.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 0, "Mach-O 64-bit executable arm64\n", ""
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="CFBundleIconFile"):
+        build_nuitka.verify_macos_app(app_path)
+
+
+def test_verify_macos_app_rejects_missing_icon_resource(tmp_path, monkeypatch):
+    app_path = make_fake_app(tmp_path)
+    (app_path / "Contents" / "Resources" / "AppIcon.icns").unlink()
+    monkeypatch.setattr(
+        build_nuitka.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 0, "Mach-O 64-bit executable arm64\n", ""
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="icon"):
         build_nuitka.verify_macos_app(app_path)
 
 
