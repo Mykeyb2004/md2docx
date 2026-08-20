@@ -1543,32 +1543,56 @@ class Md2docxGUI:
         )
         output_btn.grid(row=1, column=2, padx=5)
 
-        ttk.Label(conv_frame, text="当前配置：").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Label(conv_frame, text="Word Template:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.word_template_var = tk.StringVar()
+        template_entry = ttk.Entry(
+            conv_frame,
+            textvariable=self.word_template_var,
+            width=50,
+            state="readonly",
+        )
+        template_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=5)
+
+        ttk.Button(
+            conv_frame,
+            text="Choose...",
+            command=self.browse_word_template,
+            width=12,
+        ).grid(row=2, column=2, padx=5)
+
+        ttk.Button(
+            conv_frame,
+            text="Clear",
+            command=self.clear_word_template,
+            width=12,
+        ).grid(row=2, column=3, padx=5, sticky=(tk.W, tk.E))
+
+        ttk.Label(conv_frame, text="当前配置：").grid(row=3, column=0, sticky=tk.W, pady=5)
         config_entry = ttk.Entry(
             conv_frame,
             textvariable=self.config_file_var,
             width=50,
             state="readonly",
         )
-        config_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=5)
+        config_entry.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=5)
 
         ttk.Button(
             conv_frame,
             text="打开配置...",
             command=self.browse_config_file,
             width=12,
-        ).grid(row=2, column=2, padx=5)
+        ).grid(row=3, column=2, padx=5)
 
         ttk.Button(
             conv_frame,
             text="编辑配置...",
             command=self.open_config_editor,
             width=12,
-        ).grid(row=2, column=3, padx=5, sticky=(tk.W, tk.E))
+        ).grid(row=3, column=3, padx=5, sticky=(tk.W, tk.E))
 
         self.progress = ttk.Progressbar(conv_frame, mode="indeterminate", length=240)
         self.progress.grid(
-            row=3,
+            row=4,
             column=0,
             columnspan=3,
             padx=(0, 5),
@@ -1583,7 +1607,7 @@ class Md2docxGUI:
             style="Accent.TButton",
             width=12,
         ).grid(
-            row=3,
+            row=4,
             column=3,
             padx=5,
             pady=(15, 0),
@@ -1677,6 +1701,23 @@ class Md2docxGUI:
 
         if filename:
             self.output_var.set(filename)
+
+    def browse_word_template(self) -> None:
+        """Open a file dialog to select an optional Word document template."""
+        filename = filedialog.askopenfilename(
+            parent=self.dialog_parent(),
+            title="Select Word Template",
+            filetypes=[
+                ("Word documents", "*.docx"),
+                ("All files", "*.*"),
+            ],
+        )
+        if filename:
+            self.word_template_var.set(filename)
+
+    def clear_word_template(self) -> None:
+        """Clear the optional Word document template selection."""
+        self.word_template_var.set("")
 
     def browse_config_file(self) -> None:
         """Open file dialog to select the YAML configuration file."""
@@ -1802,10 +1843,16 @@ class Md2docxGUI:
         """Return an isolated copy of the last loaded or saved config."""
         return clone_config(self.config_document.saved_config)
 
+    def selected_word_template(self) -> str:
+        """Return the selected Word template without requiring a fully built GUI."""
+        variable = getattr(self, "word_template_var", None)
+        return variable.get().strip() if variable is not None else ""
+
     def convert_file(self) -> None:
         """Convert Markdown file to Word document."""
         input_file = self.input_var.get()
         output_file = self.output_var.get()
+        word_template_file = self.selected_word_template()
 
         if not input_file:
             messagebox.showerror(
@@ -1831,6 +1878,24 @@ class Md2docxGUI:
             )
             return
 
+        if word_template_file:
+            template_path = Path(word_template_file).expanduser()
+            if template_path.suffix.lower() != ".docx":
+                messagebox.showerror(
+                    "Error",
+                    f"Word template must be a .docx file:\n{template_path}",
+                    parent=self.dialog_parent(),
+                )
+                return
+            if not template_path.is_file():
+                messagebox.showerror(
+                    "Error",
+                    f"Word template not found:\n{template_path}",
+                    parent=self.dialog_parent(),
+                )
+                return
+            word_template_file = str(template_path)
+
         output_path = Path(output_file)
         if output_path.exists() and not messagebox.askyesno(
             "Confirm Overwrite",
@@ -1840,11 +1905,19 @@ class Md2docxGUI:
         ):
             return
 
-        thread = threading.Thread(target=self._do_conversion, args=(input_file, output_file))
+        thread_args = (input_file, output_file)
+        if word_template_file:
+            thread_args += (word_template_file,)
+        thread = threading.Thread(target=self._do_conversion, args=thread_args)
         thread.daemon = True
         thread.start()
 
-    def _do_conversion(self, input_file: str, output_file: str) -> None:
+    def _do_conversion(
+        self,
+        input_file: str,
+        output_file: str,
+        word_template_file: Optional[str] = None,
+    ) -> None:
         """Perform actual conversion (runs in background thread)."""
         try:
             self.root.after(
@@ -1854,7 +1927,10 @@ class Md2docxGUI:
             self.root.after(0, self.progress.start)
             self.root.after(0, lambda: self.status_var.set("Converting..."))
             config_data = self.build_effective_conversion_config()
-            converter = Converter(config_data=config_data)
+            converter_kwargs: Dict[str, Any] = {"config_data": config_data}
+            if word_template_file:
+                converter_kwargs["word_template"] = word_template_file
+            converter = Converter(**converter_kwargs)
 
             converter.convert(input_file, output_file)
 
