@@ -33,6 +33,7 @@ MACOS_EXECUTABLE_NAME = "md2docx-app"
 MACOS_BUILD_PYTHON_VERSION = (3, 11, 9)
 DEFAULT_TEMPLATE = REPO_ROOT / "md2docx" / "templates" / "default.yaml"
 MACOS_APP_ICON = REPO_ROOT / "assets" / "macos" / "AppIcon.icns"
+MACOS_HEADER_ICON = REPO_ROOT / "assets" / "macos" / "AppIcon.png"
 KNOWN_REMOVABLE_DIRS: FrozenSet[Path] = frozenset(
     path.resolve()
     for path in (OUTPUT_DIR, MACOS_STAGING_DIR, MACOS_BACKUP_DIR)
@@ -124,6 +125,7 @@ def build_nuitka_command(entry: str, mode: str) -> list:
                 "--macos-create-app-bundle",
                 f"--macos-app-name={MACOS_PRODUCT_NAME}",
                 f"--macos-app-icon={MACOS_APP_ICON}",
+                f"--include-data-file={MACOS_HEADER_ICON}=assets/macos/AppIcon.png",
                 f"--output-folder-name={MACOS_PRODUCT_NAME}",
             ]
         )
@@ -188,6 +190,7 @@ def preflight_macos_app(launch: bool) -> None:
         REPO_ROOT / "md2docx" / "gui.py",
         DEFAULT_TEMPLATE,
         MACOS_APP_ICON,
+        MACOS_HEADER_ICON,
     ):
         if not required.is_file() or required.stat().st_size == 0:
             raise FileNotFoundError(f"required input is missing or empty: {required}")

@@ -67,6 +67,29 @@ class _FakeWidget:
         self.configured.update(kwargs)
 
 
+class _DeferredRoot:
+    """Tk root stand-in that records callbacks until the test runs them."""
+
+    def __init__(self) -> None:
+        self.after_callbacks = []
+
+    def title(self, _value: str) -> None:
+        pass
+
+    def geometry(self, _value: str) -> None:
+        pass
+
+    def resizable(self, _width: bool, _height: bool) -> None:
+        pass
+
+    def protocol(self, _name: str, _callback) -> None:
+        pass
+
+    def after(self, _delay_ms: int, callback=None) -> None:
+        if callback:
+            self.after_callbacks.append(callback)
+
+
 def _iter_leaf_config_paths(data, path=()):
     """Yield leaf paths from a nested config dictionary."""
     if isinstance(data, dict):
@@ -239,6 +262,7 @@ def test_word_template_dialog_is_parented_and_can_be_cleared(tmp_path, monkeypat
     template_path.write_bytes(b"template")
     gui = Md2docxGUI.__new__(Md2docxGUI)
     gui.root = root
+    gui.preferences_file = tmp_path / "preferences.json"
     gui.word_template_var = _FakeStringVar()
     captured = {}
     monkeypatch.setattr(
@@ -255,6 +279,276 @@ def test_word_template_dialog_is_parented_and_can_be_cleared(tmp_path, monkeypat
 
     gui.clear_word_template()
     assert gui.word_template_var.get() == ""
+
+
+def test_gui_browse_word_template_persists_without_dropping_other_preferences(
+    tmp_path: Path, monkeypatch
+):
+    """Selecting a template must merge, rather than replace, preferences."""
+    template_path = tmp_path / "template.docx"
+    template_path.write_bytes(b"template")
+    preferences_file = tmp_path / "preferences.json"
+    preferences_file.write_text(
+        json.dumps(
+            {
+                "last_config_path": str(tmp_path / "config.yaml"),
+                "config_file": str(tmp_path / "legacy.yaml"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        gui_module.filedialog,
+        "askopenfilename",
+        lambda **_kwargs: str(template_path),
+    )
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.root = object()
+    gui.preferences_file = preferences_file
+    gui.word_template_var = _FakeStringVar()
+
+    gui.browse_word_template()
+
+    assert gui.word_template_var.get() == str(template_path)
+    assert json.loads(preferences_file.read_text(encoding="utf-8")) == {
+        "last_config_path": str(tmp_path / "config.yaml"),
+        "config_file": str(tmp_path / "legacy.yaml"),
+        "last_word_template_path": str(template_path),
+    }
+
+
+def test_gui_loads_last_word_template_path_and_reports_stale_file(tmp_path: Path):
+    """A missing remembered template should remain visible with a warning."""
+    template_path = tmp_path / "missing.docx"
+    preferences_file = tmp_path / "preferences.json"
+    preferences_file.write_text(
+        json.dumps({"last_word_template_path": str(template_path)}),
+        encoding="utf-8",
+    )
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = preferences_file
+
+    path, warning = gui.load_last_word_template()
+
+    assert path == template_path
+    assert warning is not None
+    assert str(template_path) in warning
+    assert "不存在" in warning
+
+
+def test_gui_loads_existing_last_word_template_without_warning(tmp_path: Path):
+    """A valid remembered template should restore silently."""
+    template_path = tmp_path / "template.docx"
+    template_path.write_bytes(b"template")
+    preferences_file = tmp_path / "preferences.json"
+    preferences_file.write_text(
+        json.dumps({"last_word_template_path": str(template_path)}),
+        encoding="utf-8",
+    )
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = preferences_file
+
+    assert gui.load_last_word_template() == (template_path, None)
+
+
+def test_gui_invalid_last_word_template_is_retained_and_warned(tmp_path: Path):
+    """An invalid remembered suffix must not silently erase the selected path."""
+    template_path = tmp_path / "template.txt"
+    preferences_file = tmp_path / "preferences.json"
+    preferences_file.write_text(
+        json.dumps({"last_word_template_path": str(template_path)}),
+        encoding="utf-8",
+    )
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = preferences_file
+
+    path, warning = gui.load_last_word_template()
+
+    assert path == template_path
+    assert warning is not None
+    assert ".docx" in warning
+
+
+def test_gui_clear_word_template_removes_only_template_preference(tmp_path: Path):
+    """Clearing a template must leave current and legacy config keys intact."""
+    preferences_file = tmp_path / "preferences.json"
+    preferences_file.write_text(
+        json.dumps(
+            {
+                "last_config_path": str(tmp_path / "config.yaml"),
+                "config_file": str(tmp_path / "legacy.yaml"),
+                "last_word_template_path": str(tmp_path / "template.docx"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = preferences_file
+    gui.word_template_var = _FakeStringVar(str(tmp_path / "template.docx"))
+
+    gui.clear_word_template()
+
+    assert gui.word_template_var.get() == ""
+    assert json.loads(preferences_file.read_text(encoding="utf-8")) == {
+        "last_config_path": str(tmp_path / "config.yaml"),
+        "config_file": str(tmp_path / "legacy.yaml"),
+    }
+
+
+def test_gui_save_last_config_path_merges_last_word_template(tmp_path: Path):
+    """Saving a config must retain the template preference."""
+    template_path = tmp_path / "template.docx"
+    preferences_file = tmp_path / "preferences.json"
+    preferences_file.write_text(
+        json.dumps({"last_word_template_path": str(template_path)}),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "config.yaml"
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = preferences_file
+
+    assert gui.save_last_config_path(config_path) is True
+    assert json.loads(preferences_file.read_text(encoding="utf-8")) == {
+        "last_word_template_path": str(template_path),
+        "last_config_path": str(config_path),
+    }
+
+
+def test_gui_conversion_section_initializes_from_remembered_template(monkeypatch, tmp_path):
+    """The template field should render the value loaded before UI setup."""
+    template_path = tmp_path / "template.docx"
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.last_word_template_path = template_path
+    gui.config_file_var = _FakeStringVar()
+    parent = _FakeWidget("frame")
+
+    monkeypatch.setattr(gui_module.tk, "StringVar", _FakeStringVar)
+    for widget_name in ("LabelFrame", "Label", "Entry", "Button", "Progressbar"):
+        monkeypatch.setattr(
+            gui_module.ttk,
+            widget_name,
+            lambda *args, _widget_name=widget_name, **kwargs: _FakeWidget(
+                _widget_name,
+                *args,
+                **kwargs,
+            ),
+        )
+
+    gui.setup_conversion_section(parent)
+
+    assert gui.word_template_var.get() == str(template_path)
+
+
+def test_gui_loads_the_packaged_app_icon_for_the_title(monkeypatch):
+    """The header should use the same PNG asset as the application icon."""
+    loaded_paths = []
+
+    class FakePhotoImage:
+        def subsample(self, horizontal: int, vertical: int):
+            assert (horizontal, vertical) == (32, 32)
+            return self
+
+    monkeypatch.setattr(
+        gui_module.tk,
+        "PhotoImage",
+        lambda *, file: loaded_paths.append(file) or FakePhotoImage(),
+    )
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+
+    icon = gui.load_title_icon()
+
+    assert icon is not None
+    assert loaded_paths == [str(gui_module.app_icon_png_path())]
+
+
+def test_main_window_buttons_use_chinese_labels(monkeypatch):
+    """All commands on the main window should use Chinese labels."""
+    buttons = []
+    labels = []
+
+    def make_widget(widget_type):
+        def factory(*args, **kwargs):
+            widget = _FakeWidget(widget_type, *args, **kwargs)
+            if widget_type == "Label" and "text" in kwargs:
+                labels.append(widget)
+            return widget
+
+        return factory
+
+    def make_button(*args, **kwargs):
+        widget = _FakeWidget("button", *args, **kwargs)
+        buttons.append(widget)
+        return widget
+
+    monkeypatch.setattr(gui_module.tk, "StringVar", _FakeStringVar)
+    for widget_name in ("LabelFrame", "Label", "Entry", "Progressbar"):
+        monkeypatch.setattr(gui_module.ttk, widget_name, make_widget(widget_name))
+    monkeypatch.setattr(gui_module.ttk, "Button", make_button)
+
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.last_word_template_path = None
+    gui.config_file_var = _FakeStringVar()
+    gui.setup_conversion_section(_FakeWidget("frame"))
+
+    assert [widget.kwargs["text"] for widget in buttons] == [
+        "浏览...",
+        "另存为...",
+        "选择...",
+        "清除",
+        "打开配置...",
+        "编辑配置...",
+        "转换为 Word",
+    ]
+    assert [widget.kwargs["text"] for widget in labels] == [
+        "Markdown 文件：",
+        "输出文件：",
+        "Word 模板：",
+        "当前配置：",
+    ]
+
+
+def test_gui_startup_warns_once_for_remembered_invalid_template(tmp_path, monkeypatch):
+    """Startup retains an unusable path and schedules one user-visible warning."""
+    missing_template = tmp_path / "missing.docx"
+    app_state_dir = tmp_path / ".md2docx"
+    app_state_dir.mkdir()
+    (app_state_dir / "preferences.json").write_text(
+        json.dumps({"last_word_template_path": str(missing_template)}),
+        encoding="utf-8",
+    )
+    root = _DeferredRoot()
+    warnings = []
+
+    monkeypatch.setattr(gui_module.Path, "home", classmethod(lambda _cls: tmp_path))
+    monkeypatch.setattr(gui_module.tk, "StringVar", _FakeStringVar)
+    monkeypatch.setattr(
+        gui_module.StyleManager,
+        "load_packaged_template",
+        lambda _name: {},
+    )
+    monkeypatch.setattr(Md2docxGUI, "load_history", lambda _self: [])
+    monkeypatch.setattr(Md2docxGUI, "setup_ui", lambda _self: None)
+    monkeypatch.setattr(Md2docxGUI, "refresh_history_list", lambda _self: None)
+    monkeypatch.setattr(gui_module, "center_window_on_screen", lambda _root: None)
+    monkeypatch.setattr(
+        gui_module.messagebox,
+        "showwarning",
+        lambda title, message, **kwargs: warnings.append((title, message, kwargs)),
+    )
+
+    gui = Md2docxGUI(root)
+    for callback in root.after_callbacks:
+        callback()
+
+    assert gui.last_word_template_path == missing_template
+    assert warnings == [
+        (
+            "Word模板读取提示",
+            f"上次记录的Word模板无法使用，但路径已保留：\n\n"
+            f"上次记录的模板不存在：{missing_template}",
+            {"parent": root},
+        )
+    ]
 
 
 def test_gui_rejects_invalid_word_template_before_starting_thread(tmp_path, monkeypatch):
@@ -380,7 +674,7 @@ def test_gui_confirms_before_overwriting_existing_output(
 
     gui.convert_file()
 
-    assert captured["title"] == "Confirm Overwrite"
+    assert captured["title"] == "确认覆盖"
     assert str(output_path) in captured["message"]
     assert captured["parent"] is root
     assert captured["default"] == gui_module.messagebox.NO

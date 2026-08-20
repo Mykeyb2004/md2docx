@@ -59,6 +59,16 @@ def test_app_command_includes_committed_icon_path():
     assert f"--macos-app-icon={build_nuitka.MACOS_APP_ICON}" in command
 
 
+def test_app_command_includes_header_icon_png():
+    """The GUI header icon must be bundled alongside the macOS app icon."""
+    command = build_nuitka.build_nuitka_command("gui", "app")
+
+    assert (
+        f"--include-data-file={build_nuitka.MACOS_HEADER_ICON}="
+        "assets/macos/AppIcon.png"
+    ) in command
+
+
 def test_legacy_commands_do_not_include_macos_app_icon():
     for mode in ("onefile", "standalone"):
         command = build_nuitka.build_nuitka_command("gui", mode)
