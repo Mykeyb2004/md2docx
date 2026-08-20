@@ -48,6 +48,40 @@ def test_output_file_saves_docx_to_requested_path(tmp_path, monkeypatch):
     assert doc.paragraphs[0].text == "Report"
 
 
+def test_word_template_option_preserves_template_footer(tmp_path, monkeypatch):
+    """CLI should pass the selected Word template through to conversion."""
+    input_path = tmp_path / "report.md"
+    template_path = tmp_path / "template.docx"
+    output_path = tmp_path / "custom.docx"
+    input_path.write_text("# Report\n\nCLI template test.", encoding="utf-8")
+    template = Document()
+    template.sections[0].footer.paragraphs[0].add_run("Template footer")
+    template.add_paragraph("Template placeholder")
+    template.save(template_path)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "md2docx",
+            str(input_path),
+            "--output-file",
+            str(output_path),
+            "--word-template",
+            str(template_path),
+            "--template",
+            "default",
+        ],
+    )
+
+    main()
+
+    doc = Document(output_path)
+    assert doc.paragraphs[0].text == "Report"
+    assert doc.sections[0].footer.paragraphs[0].text == "Template footer"
+    assert "Template placeholder" not in [paragraph.text for paragraph in doc.paragraphs]
+
+
 def test_existing_output_file_requires_overwrite(tmp_path, monkeypatch, capsys):
     """CLI should protect an existing output file unless --overwrite is set."""
     input_path = tmp_path / "report.md"

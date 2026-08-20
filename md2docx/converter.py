@@ -13,6 +13,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import xml.etree.ElementTree as ET
 
 from docx import Document
+from docx.oxml.ns import qn
 
 from md2docx.config_utils import clone_config, merge_config
 from md2docx.styles import StyleManager
@@ -31,6 +32,7 @@ class Converter:
         style_config: Optional[str] = None,
         config_override: Optional[Dict[str, Any]] = None,
         config_data: Optional[Dict[str, Any]] = None,
+        word_template: Optional[str] = None,
     ) -> None:
         """
         Initialize converter.
@@ -40,11 +42,14 @@ class Converter:
             style_config: Path to custom YAML style configuration
             config_override: Runtime config overrides merged over the loaded style config
             config_data: Complete in-memory style config that bypasses disk defaults
+            word_template: Path to a .docx template whose package-owned headers and
+                footers should be preserved in the generated document
         """
         self.template = template
         self.style_config = style_config
         self.config_override = config_override or {}
         self.config_data = clone_config(config_data) if config_data is not None else None
+        self.word_template = word_template
         
         # Initialize style manager
         config_path = style_config or template
@@ -127,19 +132,37 @@ class Converter:
         Returns:
             python-docx Document object
         """
-        # Create new document
-        doc = Document()
-        
         # Apply document-level styles
         doc_style = self.style_manager.get_document_style()
-        
-        # Apply document settings
-        self._apply_document_settings(doc, doc_style)
+
+        if self.word_template:
+            doc = self._load_word_template(self.word_template)
+        else:
+            doc = Document()
+            self._apply_document_settings(doc, doc_style)
         
         # Parse Markdown and add content to document
         self.parser.parse(md_content, doc, base_dir=base_dir)
         self._apply_core_properties(doc, md_content)
         
+        return doc
+
+    def _load_word_template(self, template_path: str) -> Document:
+        """Load a single-section DOCX template and clear only its body content."""
+        path = Path(template_path).expanduser()
+        if not path.exists() or not path.is_file():
+            raise FileNotFoundError(f"Word template not found: {path}")
+        if path.suffix.lower() != ".docx":
+            raise ValueError(f"Word template must be a .docx file: {path}")
+
+        doc = Document(str(path))
+        if len(doc.sections) != 1:
+            raise ValueError("Word template must contain exactly one section")
+
+        body = doc._element.body
+        for child in list(body):
+            if child.tag != qn("w:sectPr"):
+                body.remove(child)
         return doc
 
     def _apply_core_properties(self, doc: Document, md_content: str) -> None:

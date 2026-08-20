@@ -232,6 +232,93 @@ def test_main_file_dialogs_are_parented_to_root(monkeypatch):
     assert captured_save["parent"] is root
 
 
+def test_word_template_dialog_is_parented_and_can_be_cleared(tmp_path, monkeypatch):
+    """The Word template selector should use the main window and support clearing."""
+    root = object()
+    template_path = tmp_path / "template.docx"
+    template_path.write_bytes(b"template")
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.root = root
+    gui.word_template_var = _FakeStringVar()
+    captured = {}
+    monkeypatch.setattr(
+        gui_module.filedialog,
+        "askopenfilename",
+        lambda **kwargs: captured.update(kwargs) or str(template_path),
+    )
+
+    gui.browse_word_template()
+
+    assert gui.word_template_var.get() == str(template_path)
+    assert captured["parent"] is root
+    assert captured["filetypes"][0] == ("Word documents", "*.docx")
+
+    gui.clear_word_template()
+    assert gui.word_template_var.get() == ""
+
+
+def test_gui_rejects_invalid_word_template_before_starting_thread(tmp_path, monkeypatch):
+    """Invalid template paths should show an error and never start conversion."""
+    input_path = tmp_path / "input.md"
+    output_path = tmp_path / "output.docx"
+    invalid_path = tmp_path / "template.txt"
+    input_path.write_text("# Input\n", encoding="utf-8")
+    invalid_path.write_text("not a docx", encoding="utf-8")
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.root = object()
+    gui.input_var = _FakeStringVar(str(input_path))
+    gui.output_var = _FakeStringVar(str(output_path))
+    gui.word_template_var = _FakeStringVar(str(invalid_path))
+    errors = []
+    started = []
+    monkeypatch.setattr(
+        gui_module.messagebox,
+        "showerror",
+        lambda title, message, **kwargs: errors.append((title, message, kwargs)),
+    )
+    monkeypatch.setattr(
+        gui_module.threading,
+        "Thread",
+        lambda **kwargs: started.append(kwargs),
+    )
+
+    gui.convert_file()
+
+    assert errors
+    assert ".docx" in errors[0][1]
+    assert started == []
+
+
+def test_gui_passes_selected_word_template_to_background_conversion(tmp_path, monkeypatch):
+    """A selected template should be captured in the background thread arguments."""
+    input_path = tmp_path / "input.md"
+    output_path = tmp_path / "output.docx"
+    template_path = tmp_path / "template.docx"
+    input_path.write_text("# Input\n", encoding="utf-8")
+    template_path.write_bytes(b"template")
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.root = object()
+    gui.input_var = _FakeStringVar(str(input_path))
+    gui.output_var = _FakeStringVar(str(output_path))
+    gui.word_template_var = _FakeStringVar(str(template_path))
+    captured = {}
+
+    class FakeThread:
+        def __init__(self, *, target, args):
+            captured["target"] = target
+            captured["args"] = args
+
+        def start(self):
+            captured["started"] = True
+
+    monkeypatch.setattr(gui_module.threading, "Thread", FakeThread)
+
+    gui.convert_file()
+
+    assert captured["args"] == (str(input_path), str(output_path), str(template_path))
+    assert captured["started"] is True
+
+
 def test_main_validation_errors_are_parented_to_root(monkeypatch):
     """Validation popups should belong to the active main window."""
     root = object()

@@ -1,6 +1,7 @@
 """
 Test the full conversion workflow.
 """
+import hashlib
 import pytest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -8,6 +9,8 @@ import tempfile
 from zipfile import ZipFile
 from md2docx import Converter
 from docx.document import Document as DocxDocument
+from docx import Document
+from docx.shared import Inches, RGBColor
 from PIL import Image
 
 
@@ -30,6 +33,61 @@ def _docx_media_files(path: Path) -> list[str]:
 def _docx_xml(path: Path, member: str) -> ET.Element:
     with ZipFile(path) as archive:
         return ET.fromstring(archive.read(member))
+
+
+def _word_template_parts(path: Path) -> dict[str, str]:
+    """Hash template-owned header/footer XML, relationships, and media parts."""
+    prefixes = ("word/header", "word/footer", "word/media/")
+    relationship_names = {"word/_rels/document.xml.rels"}
+    with ZipFile(path) as archive:
+        relationship_names.update(
+            name
+            for name in archive.namelist()
+            if name.startswith("word/_rels/header")
+            or name.startswith("word/_rels/footer")
+        )
+        names = {
+            name
+            for name in archive.namelist()
+            if name.startswith(prefixes) or name in relationship_names
+        }
+        return {
+            name: hashlib.sha256(archive.read(name)).hexdigest()
+            for name in sorted(names)
+        }
+
+
+def _create_word_template(path: Path, image_path: Path, *, sections: int = 1) -> None:
+    """Create a DOCX fixture with formatted primary, first-page, and even headers/footers."""
+    document = Document()
+    section = document.sections[0]
+    section.page_width = Inches(8.5)
+    section.page_height = Inches(11)
+    section.top_margin = Inches(0.75)
+    section.bottom_margin = Inches(0.8)
+    section.left_margin = Inches(0.9)
+    section.right_margin = Inches(0.95)
+    section.header_distance = Inches(0.25)
+    section.footer_distance = Inches(0.3)
+    section.different_first_page_header_footer = True
+    document.settings.odd_and_even_pages_header_footer = True
+
+    primary_header = section.header.paragraphs[0]
+    primary_header.alignment = 2
+    primary_run = primary_header.add_run("Primary header")
+    primary_run.bold = True
+    primary_run.font.color.rgb = RGBColor(0x12, 0x34, 0x56)
+    primary_header.add_run().add_picture(str(image_path), width=Inches(0.25))
+    section.first_page_header.paragraphs[0].add_run("First-page header").italic = True
+    section.even_page_header.paragraphs[0].add_run("Even-page header").underline = True
+
+    section.footer.paragraphs[0].add_run("Primary footer").bold = True
+    section.first_page_footer.paragraphs[0].add_run("First-page footer")
+    section.even_page_footer.paragraphs[0].add_run("Even-page footer")
+    document.add_paragraph("Template body placeholder")
+    for _ in range(sections - 1):
+        document.add_section()
+    document.save(path)
 
 
 def test_convert_string_basic():
@@ -257,6 +315,66 @@ def test_to_document():
     
     assert isinstance(doc, DocxDocument)
     assert len(doc.paragraphs) > 0
+
+
+def test_word_template_preserves_headers_footers_media_and_geometry(tmp_path):
+    """A Word template should contribute its complete header/footer package unchanged."""
+    image_path = tmp_path / "header-logo.png"
+    template_path = tmp_path / "template.docx"
+    output_path = tmp_path / "output.docx"
+    _write_sample_png(image_path)
+    _create_word_template(template_path, image_path)
+
+    converter = Converter(
+        config_override={"document": {"page_size": "A4", "margin_top": "3cm"}},
+        word_template=str(template_path),
+    )
+    converter.convert_string("# Generated heading\n\nGenerated body.", str(output_path))
+
+    template = Document(template_path)
+    output = Document(output_path)
+    assert "Generated body." in [paragraph.text for paragraph in output.paragraphs]
+    assert "Template body placeholder" not in [paragraph.text for paragraph in output.paragraphs]
+    assert _word_template_parts(template_path) == _word_template_parts(output_path)
+
+    template_section = template.sections[0]
+    output_section = output.sections[0]
+    for attribute in (
+        "page_width",
+        "page_height",
+        "top_margin",
+        "bottom_margin",
+        "left_margin",
+        "right_margin",
+        "header_distance",
+        "footer_distance",
+        "different_first_page_header_footer",
+    ):
+        assert getattr(output_section, attribute) == getattr(template_section, attribute)
+    assert output.settings.odd_and_even_pages_header_footer is True
+
+
+def test_word_template_rejects_missing_file(tmp_path):
+    with pytest.raises(FileNotFoundError, match="Word template not found"):
+        Converter(word_template=str(tmp_path / "missing.docx")).to_document("# Test")
+
+
+def test_word_template_rejects_non_docx_path(tmp_path):
+    template_path = tmp_path / "template.txt"
+    template_path.write_text("not a Word document", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must be a .docx file"):
+        Converter(word_template=str(template_path)).to_document("# Test")
+
+
+def test_word_template_rejects_multiple_sections(tmp_path):
+    image_path = tmp_path / "header-logo.png"
+    template_path = tmp_path / "multi-section.docx"
+    _write_sample_png(image_path)
+    _create_word_template(template_path, image_path, sections=2)
+
+    with pytest.raises(ValueError, match="exactly one section"):
+        Converter(word_template=str(template_path)).to_document("# Test")
 
 
 def test_converter_with_template():

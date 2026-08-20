@@ -35,7 +35,11 @@ main()
    - 点击 "Save As..." 按钮
    - 或直接修改输出路径
 
-3. **执行转换**
+3. **可选 Word 模板**
+   - 在 "Word Template" 行点击 "Choose..." 选择 `.docx` 模板
+   - 模板会保留页眉、页脚中的文字、图片和格式；点击 "Clear" 可取消套用
+
+4. **执行转换**
    - 点击 "🔄 Convert to Word" 按钮
    - 查看进度条和状态
    - 完成后显示成功提示
@@ -98,8 +102,9 @@ main()
 │ File Conversion                         │
 │  Markdown File: [________] [Browse...]  │
 │  Output File:   [________] [Save As...] │
-│  当前配置: [________] [打开] [编辑]     │
-│                    [🔄 Convert to Word] │
+│  Word Template: [____] [Choose] [Clear] │
+│  当前配置:     [____] [打开] [编辑]     │
+│                       [🔄 Convert to Word] │
 ├─────────────────────────────────────────┤
 │ Conversion History                      │
 │  Time    | Input | Output | Status      │

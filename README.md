@@ -12,6 +12,7 @@
 - 支持本地 Markdown 图片；相对路径以 Markdown 文件所在目录为基准解析。
 - 公式优先输出为 Word 原生 OMML；无法使用 Pandoc 时回退为 PNG。
 - Mermaid 代码块可转为图片，并按页面空间调整大小和分页。
+- 可选套用 Word `.docx` 模板，保留模板页眉、页脚中的文字、图片及原有格式。
 
 ## 支持的 Markdown
 
@@ -72,6 +73,9 @@ uv run md2docx input.md --output-file output.docx --overwrite
 # 使用自定义 YAML 样式
 uv run md2docx input.md --style-file my_styles.yaml
 
+# 套用 Word 模板（保留页眉页脚）
+uv run md2docx input.md --word-template letterhead.docx --output-file output.docx
+
 # 查看全部选项
 uv run md2docx --help
 ```
@@ -86,6 +90,8 @@ uv run --project /path/to/md2docx md2docx /path/to/input.md --output-file /path/
 
 `--template` 接口当前仅有内置 `default` 模板；实际项目建议通过 `--style-file` 使用自己的 YAML 配置。
 
+`--word-template` 只接受 `.docx` 文件，并要求模板包含一个 section。转换时会清空模板正文占位内容，保留模板的页眉、页脚、图片、关系和页面几何设置；模板页面设置优先于 YAML 中的 `document` 设置。它可以与 `--template` 或 `--style-file` 一起使用。
+
 ### 图形界面
 
 ```bash
@@ -98,6 +104,7 @@ GUI 提供单文件转换、进度显示、历史记录和配置文件工作流�
 - 在编辑器中维护已保存配置与编辑草稿，未保存草稿不会影响转换。
 - 支持另存为、恢复内置默认、外部修改冲突检测以及原子保存。
 - 配置编辑器提供颜色控件、常用枚举、表格版式和字段说明。
+- 在 `Word Template` 行选择可选的 `.docx` 模板；点击 `Clear` 可恢复普通无模板转换。模板选择只对当前转换生效，不会写入偏好设置。
 
 详细操作见 [GUI 使用指南](docs/GUI_GUIDE.md)。GUI 目前只转换单个文件；批量转换请使用 CLI。
 
@@ -109,6 +116,13 @@ from md2docx import Converter
 # 转换 Markdown 文件；相对图片路径会按 input.md 所在目录解析
 converter = Converter(style_config="my_styles.yaml")
 converter.convert("input.md", "output.docx")
+
+# 使用 Word 模板保留页眉页脚；可同时传入 YAML 样式配置
+template_converter = Converter(
+    style_config="my_styles.yaml",
+    word_template="letterhead.docx",
+)
+template_converter.convert("input.md", "output.docx")
 
 # 转换字符串；需要显式传入 base_dir 才能解析相对图片路径
 content = """# 报告标题

@@ -43,7 +43,8 @@ def main() -> None:
                '  md2docx input.md --output-dir out   # Save into a directory\n'
                '  md2docx docs --output-dir out       # Recursively convert all .md files\n'
                '  md2docx input.md -t chinese_academic  # Use template\n'
-               '  md2docx input.md -s custom.yaml     # Use custom styles',
+               '  md2docx input.md -s custom.yaml     # Use custom styles\n'
+               '  md2docx input.md --word-template letterhead.docx  # Preserve Word header/footer',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -97,6 +98,14 @@ def main() -> None:
         metavar='FILE',
         help='Path to custom YAML style configuration file'
     )
+
+    parser.add_argument(
+        '--word-template',
+        type=str,
+        default=None,
+        metavar='FILE',
+        help='Path to a Word .docx template (preserves its headers and footers)',
+    )
     
     parser.add_argument(
         '-v', '--version',
@@ -134,7 +143,8 @@ def main() -> None:
         # Create converter
         converter = Converter(
             template=args.template,
-            style_config=args.style_config
+            style_config=args.style_config,
+            word_template=args.word_template,
         )
 
         if input_path.is_dir():
