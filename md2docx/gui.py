@@ -3,6 +3,7 @@ GUI application for md2docx converter.
 Provides visual interface for file conversion with history tracking.
 """
 import json
+import sys
 import threading
 import tkinter as tk
 from dataclasses import dataclass
@@ -31,6 +32,18 @@ ConfigPath = Tuple[str, ...]
 FIELD_WIDGET_ENTRY = "entry"
 FIELD_WIDGET_COMBOBOX = "combobox"
 FIELD_WIDGET_COLOR = "color"
+
+APP_ICON_RELATIVE_PATH = Path("assets") / "macos" / "AppIcon.png"
+
+
+def app_icon_png_path() -> Path:
+    """Return the bundled PNG used by the GUI title."""
+    source_path = Path(__file__).resolve().parent.parent / APP_ICON_RELATIVE_PATH
+    if source_path.is_file():
+        return source_path
+
+    executable_path = Path(sys.argv[0]).resolve().parent / APP_ICON_RELATIVE_PATH
+    return executable_path
 
 
 @dataclass(frozen=True)
@@ -1444,6 +1457,10 @@ class Md2docxGUI:
         app_state_dir.mkdir(parents=True, exist_ok=True)
         self.history_file = app_state_dir / "history.json"
         self.preferences_file = app_state_dir / "preferences.json"
+        (
+            self.last_word_template_path,
+            self.startup_word_template_error,
+        ) = self.load_last_word_template()
         self.packaged_default_config = StyleManager.load_packaged_template("default")
         self.config_editor: Optional[ConfigEditorWindow] = None
         self.config_document, self.startup_config_error = self.load_initial_config_document()
@@ -1459,6 +1476,15 @@ class Md2docxGUI:
                 lambda error=self.startup_config_error: messagebox.showwarning(
                     "配置读取失败",
                     f"无法载入上次使用的配置，已改用内置默认配置。\n\n{error}",
+                    parent=self.root,
+                ),
+            )
+        if self.startup_word_template_error:
+            self.root.after(
+                0,
+                lambda error=self.startup_word_template_error: messagebox.showwarning(
+                    "Word模板读取提示",
+                    f"上次记录的Word模板无法使用，但路径已保留：\n\n{error}",
                     parent=self.root,
                 ),
             )
@@ -1492,9 +1518,12 @@ class Md2docxGUI:
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(2, weight=1)
 
+        self.title_icon = self.load_title_icon()
         title_label = ttk.Label(
             main_frame,
-            text="📄 Markdown to Word Converter",
+            text="Markdown to Word Converter",
+            image=self.title_icon,
+            compound=tk.LEFT,
             font=("Helvetica", 18, "bold"),
         )
         title_label.grid(row=0, column=0, pady=(0, 20), sticky=tk.W)
@@ -1502,7 +1531,7 @@ class Md2docxGUI:
         self.setup_conversion_section(main_frame)
         self.setup_history_section(main_frame)
 
-        self.status_var = tk.StringVar(value="Ready")
+        self.status_var = tk.StringVar(value="就绪")
         status_bar = ttk.Label(
             main_frame,
             textvariable=self.status_var,
@@ -1511,40 +1540,54 @@ class Md2docxGUI:
         )
         status_bar.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
 
+    @staticmethod
+    def load_title_icon() -> Optional[tk.PhotoImage]:
+        """Load the application PNG at a compact size for the title row."""
+        try:
+            return tk.PhotoImage(file=str(app_icon_png_path())).subsample(32, 32)
+        except tk.TclError:
+            return None
+
     def setup_conversion_section(self, parent: ttk.Frame) -> None:
         """Setup file selection and conversion controls."""
-        conv_frame = ttk.LabelFrame(parent, text="File Conversion", padding="10")
+        conv_frame = ttk.LabelFrame(parent, text="文件转换", padding="10")
         conv_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         conv_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(conv_frame, text="Markdown File:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(conv_frame, text="Markdown 文件：").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.input_var = tk.StringVar()
         input_entry = ttk.Entry(conv_frame, textvariable=self.input_var, width=50)
         input_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5)
 
         browse_btn = ttk.Button(
             conv_frame,
-            text="Browse...",
+            text="浏览...",
             command=self.browse_input_file,
             width=12,
         )
         browse_btn.grid(row=0, column=2, padx=5)
 
-        ttk.Label(conv_frame, text="Output File:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        ttk.Label(conv_frame, text="输出文件：").grid(row=1, column=0, sticky=tk.W, pady=5)
         self.output_var = tk.StringVar()
         output_entry = ttk.Entry(conv_frame, textvariable=self.output_var, width=50)
         output_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=5)
 
         output_btn = ttk.Button(
             conv_frame,
-            text="Save As...",
+            text="另存为...",
             command=self.browse_output_file,
             width=12,
         )
         output_btn.grid(row=1, column=2, padx=5)
 
-        ttk.Label(conv_frame, text="Word Template:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.word_template_var = tk.StringVar()
+        ttk.Label(conv_frame, text="Word 模板：").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.word_template_var = tk.StringVar(
+            value=(
+                str(self.last_word_template_path)
+                if getattr(self, "last_word_template_path", None) is not None
+                else ""
+            )
+        )
         template_entry = ttk.Entry(
             conv_frame,
             textvariable=self.word_template_var,
@@ -1555,14 +1598,14 @@ class Md2docxGUI:
 
         ttk.Button(
             conv_frame,
-            text="Choose...",
+            text="选择...",
             command=self.browse_word_template,
             width=12,
         ).grid(row=2, column=2, padx=5)
 
         ttk.Button(
             conv_frame,
-            text="Clear",
+            text="清除",
             command=self.clear_word_template,
             width=12,
         ).grid(row=2, column=3, padx=5, sticky=(tk.W, tk.E))
@@ -1602,7 +1645,7 @@ class Md2docxGUI:
 
         ttk.Button(
             conv_frame,
-            text="转换格式",
+            text="转换为 Word",
             command=self.convert_file,
             style="Accent.TButton",
             width=12,
@@ -1616,7 +1659,7 @@ class Md2docxGUI:
 
     def setup_history_section(self, parent: ttk.Frame) -> None:
         """Setup history list display."""
-        history_frame = ttk.LabelFrame(parent, text="Conversion History", padding="10")
+        history_frame = ttk.LabelFrame(parent, text="转换历史", padding="10")
         history_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         history_frame.columnconfigure(0, weight=1)
         history_frame.rowconfigure(0, weight=1)
@@ -1629,10 +1672,10 @@ class Md2docxGUI:
             height=10,
         )
 
-        self.history_tree.heading("Time", text="Time")
-        self.history_tree.heading("Input", text="Input File")
-        self.history_tree.heading("Output", text="Output File")
-        self.history_tree.heading("Status", text="Status")
+        self.history_tree.heading("Time", text="时间")
+        self.history_tree.heading("Input", text="输入文件")
+        self.history_tree.heading("Output", text="输出文件")
+        self.history_tree.heading("Status", text="状态")
 
         self.history_tree.column("Time", width=150)
         self.history_tree.column("Input", width=250)
@@ -1654,13 +1697,13 @@ class Md2docxGUI:
 
         ttk.Button(
             btn_frame,
-            text="🔄 Reload Selected",
+            text="重新载入选中记录",
             command=self.reload_from_history,
         ).pack(side=tk.LEFT, padx=5)
 
         ttk.Button(
             btn_frame,
-            text="🗑️ Clear History",
+            text="清空历史记录",
             command=self.clear_history,
         ).pack(side=tk.LEFT, padx=5)
 
@@ -1674,7 +1717,7 @@ class Md2docxGUI:
         """Open file dialog to select input Markdown file."""
         filename = filedialog.askopenfilename(
             parent=self.dialog_parent(),
-            title="Select Markdown File",
+            title="选择 Markdown 文件",
             filetypes=[
                 ("Markdown files", "*.md"),
                 ("Text files", "*.txt"),
@@ -1691,7 +1734,7 @@ class Md2docxGUI:
         """Open file dialog to select output Word file."""
         filename = filedialog.asksaveasfilename(
             parent=self.dialog_parent(),
-            title="Save Word Document As",
+            title="另存为 Word 文档",
             defaultextension=".docx",
             filetypes=[
                 ("Word documents", "*.docx"),
@@ -1706,24 +1749,41 @@ class Md2docxGUI:
         """Open a file dialog to select an optional Word document template."""
         filename = filedialog.askopenfilename(
             parent=self.dialog_parent(),
-            title="Select Word Template",
+            title="选择 Word 模板",
             filetypes=[
                 ("Word documents", "*.docx"),
                 ("All files", "*.*"),
             ],
         )
         if filename:
-            self.word_template_var.set(filename)
+            template_path = Path(filename).expanduser()
+            self.word_template_var.set(str(template_path))
+            self.last_word_template_path = template_path
+            if hasattr(self, "preferences_file") and not self.save_last_word_template_path(
+                template_path
+            ):
+                messagebox.showwarning(
+                    "偏好保存失败",
+                    "Word模板已选择，但无法记录为下次启动模板。",
+                    parent=self.dialog_parent(),
+                )
 
     def clear_word_template(self) -> None:
         """Clear the optional Word document template selection."""
         self.word_template_var.set("")
+        self.last_word_template_path = None
+        if hasattr(self, "preferences_file") and not self.clear_last_word_template_path():
+            messagebox.showwarning(
+                "偏好保存失败",
+                "Word模板已清除，但无法更新下次启动偏好。",
+                parent=self.dialog_parent(),
+            )
 
     def browse_config_file(self) -> None:
         """Open file dialog to select the YAML configuration file."""
         filename = filedialog.askopenfilename(
             parent=self.dialog_parent(),
-            title="Select Configuration File",
+            title="选择配置文件",
             filetypes=[
                 ("YAML files", "*.yaml *.yml"),
                 ("All files", "*.*"),
@@ -1787,19 +1847,60 @@ class Md2docxGUI:
                 parent=self.root,
             )
 
-    def load_last_config_path(self) -> Optional[Path]:
-        """Load the last successfully used path, including the legacy key."""
+    def load_preferences(self) -> Dict[str, Any]:
+        """Load the JSON preferences object, falling back to an empty mapping."""
         try:
             if self.preferences_file.exists():
                 with open(self.preferences_file, "r", encoding="utf-8") as handle:
                     loaded = json.load(handle)
-
                 if isinstance(loaded, dict):
-                    config_file = loaded.get("last_config_path") or loaded.get("config_file")
-                    if isinstance(config_file, str) and config_file:
-                        return Path(config_file).expanduser()
+                    return loaded
         except Exception:
             pass
+        return {}
+
+    def save_preferences(self, preferences: Dict[str, Any]) -> bool:
+        """Persist the complete merged preferences object."""
+        try:
+            self.preferences_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.preferences_file, "w", encoding="utf-8") as handle:
+                json.dump(preferences, handle, indent=2, ensure_ascii=False)
+        except Exception as exc:
+            print(f"Failed to save preferences: {exc}")
+            return False
+        return True
+
+    def load_last_word_template(self) -> Tuple[Optional[Path], Optional[str]]:
+        """Load the remembered template and describe a stale or invalid path."""
+        raw_path = self.load_preferences().get("last_word_template_path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            return None, None
+
+        template_path = Path(raw_path).expanduser()
+        if template_path.suffix.lower() != ".docx":
+            return template_path, f"上次记录的模板不是 .docx 文件：{template_path}"
+        if not template_path.is_file():
+            return template_path, f"上次记录的模板不存在：{template_path}"
+        return template_path, None
+
+    def save_last_word_template_path(self, template_path: Path) -> bool:
+        """Merge and persist the selected Word template path."""
+        preferences = self.load_preferences()
+        preferences["last_word_template_path"] = str(template_path.expanduser())
+        return self.save_preferences(preferences)
+
+    def clear_last_word_template_path(self) -> bool:
+        """Remove only the remembered Word template preference."""
+        preferences = self.load_preferences()
+        preferences.pop("last_word_template_path", None)
+        return self.save_preferences(preferences)
+
+    def load_last_config_path(self) -> Optional[Path]:
+        """Load the last successfully used path, including the legacy key."""
+        loaded = self.load_preferences()
+        config_file = loaded.get("last_config_path") or loaded.get("config_file")
+        if isinstance(config_file, str) and config_file:
+            return Path(config_file).expanduser()
 
         return None
 
@@ -1819,19 +1920,9 @@ class Md2docxGUI:
 
     def save_last_config_path(self, config_path: Path) -> bool:
         """Persist the last successfully opened or saved config path."""
-        try:
-            self.preferences_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.preferences_file, "w", encoding="utf-8") as handle:
-                json.dump(
-                    {"last_config_path": str(config_path)},
-                    handle,
-                    indent=2,
-                    ensure_ascii=False,
-                )
-        except Exception as exc:
-            print(f"Failed to save preferences: {exc}")
-            return False
-        return True
+        preferences = self.load_preferences()
+        preferences["last_config_path"] = str(config_path.expanduser())
+        return self.save_preferences(preferences)
 
     def describe_current_config(self) -> str:
         """Return the path label displayed in the main window and editor."""
@@ -1856,24 +1947,24 @@ class Md2docxGUI:
 
         if not input_file:
             messagebox.showerror(
-                "Error",
-                "Please select an input Markdown file.",
+                "错误",
+                "请选择输入 Markdown 文件。",
                 parent=self.dialog_parent(),
             )
             return
 
         if not output_file:
             messagebox.showerror(
-                "Error",
-                "Please specify an output file path.",
+                "错误",
+                "请指定输出文件路径。",
                 parent=self.dialog_parent(),
             )
             return
 
         if not Path(input_file).exists():
             messagebox.showerror(
-                "Error",
-                f"Input file not found:\n{input_file}",
+                "错误",
+                f"找不到输入文件：\n{input_file}",
                 parent=self.dialog_parent(),
             )
             return
@@ -1882,15 +1973,15 @@ class Md2docxGUI:
             template_path = Path(word_template_file).expanduser()
             if template_path.suffix.lower() != ".docx":
                 messagebox.showerror(
-                    "Error",
-                    f"Word template must be a .docx file:\n{template_path}",
+                    "错误",
+                    f"Word 模板必须是 .docx 文件：\n{template_path}",
                     parent=self.dialog_parent(),
                 )
                 return
             if not template_path.is_file():
                 messagebox.showerror(
-                    "Error",
-                    f"Word template not found:\n{template_path}",
+                    "错误",
+                    f"找不到 Word 模板：\n{template_path}",
                     parent=self.dialog_parent(),
                 )
                 return
@@ -1898,8 +1989,8 @@ class Md2docxGUI:
 
         output_path = Path(output_file)
         if output_path.exists() and not messagebox.askyesno(
-            "Confirm Overwrite",
-            f"The output file already exists:\n{output_path}\n\nDo you want to overwrite it?",
+            "确认覆盖",
+            f"输出文件已存在：\n{output_path}\n\n是否覆盖？",
             parent=self.dialog_parent(),
             default=messagebox.NO,
         ):
@@ -1925,7 +2016,7 @@ class Md2docxGUI:
                 lambda: self.progress.configure(mode="indeterminate", value=0),
             )
             self.root.after(0, self.progress.start)
-            self.root.after(0, lambda: self.status_var.set("Converting..."))
+            self.root.after(0, lambda: self.status_var.set("正在转换..."))
             config_data = self.build_effective_conversion_config()
             converter_kwargs: Dict[str, Any] = {"config_data": config_data}
             if word_template_file:
@@ -1942,12 +2033,12 @@ class Md2docxGUI:
                 self.root.update_idletasks()
 
             self.root.after(0, finish_progress)
-            self.root.after(0, lambda: self.status_var.set(f"✓ Conversion successful: {output_file}"))
+            self.root.after(0, lambda: self.status_var.set(f"✓ 转换成功：{output_file}"))
             self.root.after(
                 0,
                 lambda: messagebox.showinfo(
-                    "Success",
-                    f"File converted successfully!\n\nOutput: {output_file}",
+                    "转换成功",
+                    f"文件已成功转换！\n\n输出：{output_file}",
                     parent=self.dialog_parent(),
                 ),
             )
@@ -1958,12 +2049,12 @@ class Md2docxGUI:
             self.add_to_history(input_file, output_file, f"Failed: {error_message}")
 
             self.root.after(0, self.progress.stop)
-            self.root.after(0, lambda: self.status_var.set("✗ Conversion failed"))
+            self.root.after(0, lambda: self.status_var.set("✗ 转换失败"))
             self.root.after(
                 0,
                 lambda: messagebox.showerror(
-                    "Conversion Error",
-                    f"Failed to convert file:\n\n{error_message}",
+                    "转换错误",
+                    f"文件转换失败：\n\n{error_message}",
                     parent=self.dialog_parent(),
                 ),
             )
@@ -2040,8 +2131,8 @@ class Md2docxGUI:
         selection = self.history_tree.selection()
         if not selection:
             messagebox.showinfo(
-                "Info",
-                "Please select a history item first.",
+                "提示",
+                "请先选择一条历史记录。",
                 parent=self.dialog_parent(),
             )
             return
@@ -2053,19 +2144,19 @@ class Md2docxGUI:
             record = self.history[index]
             self.input_var.set(record["input"])
             self.output_var.set(record["output"])
-            self.status_var.set(f"Loaded from history: {record['time']}")
+            self.status_var.set(f"已从历史记录载入：{record['time']}")
 
     def clear_history(self) -> None:
         """Clear all conversion history."""
         if messagebox.askyesno(
-            "Confirm Clear History",
-            "Are you sure you want to clear all conversion history?",
+            "确认清空历史",
+            "确定要清空全部转换历史记录吗？",
             parent=self.dialog_parent(),
         ):
             self.history = []
             self.save_history()
             self.refresh_history_list()
-            self.status_var.set("History cleared")
+            self.status_var.set("历史记录已清空")
 
 
 def main() -> None:
