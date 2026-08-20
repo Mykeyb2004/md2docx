@@ -7,8 +7,11 @@ from docx import Document
 from docx.shared import Pt, RGBColor, Inches, Cm, Mm, Emu
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from docx.oxml import OxmlElement
+from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
+from docx.opc.constants import CONTENT_TYPE, RELATIONSHIP_TYPE
+from docx.opc.packuri import PackURI
+from docx.parts.numbering import NumberingPart
 import re
 import mistune
 from io import BytesIO
@@ -69,11 +72,10 @@ class DocxRenderer(mistune.BaseRenderer):
             background_color=mermaid_style.get('background_color', 'white'),
             scale=mermaid_style.get('scale'),
         )
-        self._ordered_abstract_num_id = self._find_list_abstract_num_id(
-            style_id='ListNumber',
-            num_format='decimal',
-            fallback=7,
-        )
+        # Numbering is initialized lazily because a valid Word template may not
+        # contain a numbering part at all (for example, a header-only template).
+        self._ordered_abstract_num_id: Optional[int] = None
+        self._numbering_was_missing = not self._document_has_numbering_part()
     
     def _parse_font_size(self, size_str: str) -> int:
         """
@@ -517,7 +519,7 @@ class DocxRenderer(mistune.BaseRenderer):
         concrete numbering instance for each Markdown ordered list block. This
         lets every block restart from 1 instead of continuing the previous one.
         """
-        numbering = self.doc.part.numbering_part.numbering_definitions._numbering
+        numbering = self._get_numbering_part().numbering_definitions._numbering
 
         matches = numbering.xpath(
             f'./w:abstractNum[w:lvl/w:pStyle[@w:val="{style_id}"]]/@w:abstractNumId'
@@ -531,13 +533,83 @@ class DocxRenderer(mistune.BaseRenderer):
         if matches:
             return int(matches[0])
 
-        return fallback
+        abstract_ids = [
+            int(value)
+            for value in numbering.xpath('./w:abstractNum/@w:abstractNumId')
+        ]
+        abstract_num_id = fallback
+        if abstract_num_id in abstract_ids:
+            abstract_num_id = max(abstract_ids, default=fallback - 1) + 1
+
+        abstract_num = OxmlElement('w:abstractNum')
+        abstract_num.set(qn('w:abstractNumId'), str(abstract_num_id))
+
+        multi_level_type = OxmlElement('w:multiLevelType')
+        multi_level_type.set(qn('w:val'), 'singleLevel')
+        abstract_num.append(multi_level_type)
+
+        level = OxmlElement('w:lvl')
+        level.set(qn('w:ilvl'), '0')
+        start = OxmlElement('w:start')
+        start.set(qn('w:val'), '1')
+        level.append(start)
+        num_fmt = OxmlElement('w:numFmt')
+        num_fmt.set(qn('w:val'), num_format)
+        level.append(num_fmt)
+        level_text = OxmlElement('w:lvlText')
+        level_text.set(qn('w:val'), '%1.')
+        level.append(level_text)
+        level_jc = OxmlElement('w:lvlJc')
+        level_jc.set(qn('w:val'), 'left')
+        level.append(level_jc)
+        paragraph_properties = OxmlElement('w:pPr')
+        indentation = OxmlElement('w:ind')
+        indentation.set(qn('w:left'), '720')
+        indentation.set(qn('w:hanging'), '360')
+        paragraph_properties.append(indentation)
+        level.append(paragraph_properties)
+        abstract_num.append(level)
+        numbering.append(abstract_num)
+        return abstract_num_id
+
+    def _get_numbering_part(self) -> Any:
+        """Return the document numbering part, creating one when absent."""
+        try:
+            return self.doc.part.numbering_part
+        except NotImplementedError:
+            # python-docx 1.2.0 exposes ``numbering_part`` as a lazy property,
+            # but its fallback constructor is intentionally unimplemented.
+            root = parse_xml(
+                b'<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
+            )
+            numbering_part = NumberingPart(
+                PackURI('/word/numbering.xml'),
+                CONTENT_TYPE.WML_NUMBERING,
+                root,
+                self.doc.part.package,
+            )
+            self.doc.part.relate_to(numbering_part, RELATIONSHIP_TYPE.NUMBERING)
+            return numbering_part
+
+    def _document_has_numbering_part(self) -> bool:
+        """Return whether the source document supplied numbering definitions."""
+        try:
+            self.doc.part.part_related_by(RELATIONSHIP_TYPE.NUMBERING)
+        except KeyError:
+            return False
+        return True
 
     def _create_ordered_list_num_id(self) -> int:
         """
         Create a fresh numbering sequence for a single Markdown ordered list block.
         """
-        numbering = self.doc.part.numbering_part.numbering_definitions._numbering
+        if self._ordered_abstract_num_id is None:
+            self._ordered_abstract_num_id = self._find_list_abstract_num_id(
+                style_id='ListNumber',
+                num_format='decimal',
+                fallback=7,
+            )
+        numbering = self._get_numbering_part().numbering_definitions._numbering
         num = numbering.add_num(self._ordered_abstract_num_id)
         num.add_lvlOverride(ilvl=0).add_startOverride(1)
         return int(num.numId)
@@ -1711,28 +1783,10 @@ class DocxRenderer(mistune.BaseRenderer):
         # Get or create paragraph properties
         pPr = paragraph._element.get_or_add_pPr()
         
-        # Create numbering properties
-        numPr = OxmlElement('w:numPr')
-        
-        # Create indent level
-        ilvl = OxmlElement('w:ilvl')
-        ilvl.set(qn('w:val'), str(depth))
-        numPr.append(ilvl)
-        
-        # Create numbering ID (use 1 for bullets)
-        numId = OxmlElement('w:numId')
-        numId.set(qn('w:val'), '1')
-        numPr.append(numId)
-        
-        # Add to paragraph properties
-        pPr.append(numPr)
-        
-        # Add custom bullet as text at the beginning (workaround)
-        # This is a simpler approach than creating complex numbering definitions
-        if bullet_char != '•':  # Only if not default
+        # Add custom bullet as text at the beginning (workaround).
+        # This keeps header-only templates usable when they omit numbering.xml.
+        if bullet_char != '•':
             # Remove the numbering and add bullet manually
-            pPr.remove(numPr)
-            
             # Insert bullet at the beginning of paragraph
             runs = paragraph.runs
             if runs:
@@ -1742,9 +1796,25 @@ class DocxRenderer(mistune.BaseRenderer):
             else:
                 # Add bullet run
                 run = paragraph.add_run(f"{bullet_char}\t")
+        elif self._numbering_was_missing:
+            # A minimal template has no bullet definition for ``List Bullet``.
+            # Use a visible marker rather than silently emitting unmarked text.
+            runs = paragraph.runs
+            if runs:
+                runs[0].text = f"•\t{runs[0].text}"
+            else:
+                paragraph.add_run("•\t")
         else:
-            # Use Word's default bullet style
-            paragraph.style = 'List Bullet'
+            try:
+                paragraph.style = 'List Bullet'
+            except KeyError:
+                # The list marker remains visible even when a minimal template
+                # has no built-in list styles or numbering definitions.
+                runs = paragraph.runs
+                if runs:
+                    runs[0].text = f"•\t{runs[0].text}"
+                else:
+                    paragraph.add_run("•\t")
     
     def _apply_numbered_list(
         self,
@@ -1762,7 +1832,15 @@ class DocxRenderer(mistune.BaseRenderer):
             depth: Nesting depth
             list_num_id: Concrete numbering instance for this Markdown list block
         """
-        paragraph.style = 'List Number'
+        try:
+            paragraph.style = 'List Number'
+        except KeyError:
+            # Header-only templates often omit built-in list styles. The
+            # explicit numbering properties still render correctly without it.
+            try:
+                paragraph.style = 'List Paragraph'
+            except KeyError:
+                pass
 
         if list_num_id is not None:
             self._set_paragraph_numbering(paragraph, list_num_id, ilvl=0)

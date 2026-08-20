@@ -1954,7 +1954,8 @@ class Md2docxGUI:
             self.root.after(0, self.refresh_history_list)
 
         except Exception as exc:
-            self.add_to_history(input_file, output_file, f"Failed: {str(exc)}")
+            error_message = self.format_conversion_error(exc)
+            self.add_to_history(input_file, output_file, f"Failed: {error_message}")
 
             self.root.after(0, self.progress.stop)
             self.root.after(0, lambda: self.status_var.set("✗ Conversion failed"))
@@ -1962,11 +1963,17 @@ class Md2docxGUI:
                 0,
                 lambda: messagebox.showerror(
                     "Conversion Error",
-                    f"Failed to convert file:\n\n{str(exc)}",
+                    f"Failed to convert file:\n\n{error_message}",
                     parent=self.dialog_parent(),
                 ),
             )
             self.root.after(0, self.refresh_history_list)
+
+    @staticmethod
+    def format_conversion_error(exc: Exception) -> str:
+        """Return a useful conversion error even when the exception has no text."""
+        detail = str(exc).strip()
+        return f"{type(exc).__name__}: {detail}" if detail else type(exc).__name__
 
     def load_history(self) -> List[Dict[str, str]]:
         """Load conversion history from JSON file."""
