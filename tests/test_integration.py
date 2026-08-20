@@ -90,6 +90,24 @@ def _create_word_template(path: Path, image_path: Path, *, sections: int = 1) ->
     document.save(path)
 
 
+def _remove_numbering_part(path: Path) -> None:
+    """Strip numbering XML and its document relationship from a DOCX fixture."""
+    temporary_path = path.with_suffix(".without-numbering.docx")
+    with ZipFile(path) as source, ZipFile(temporary_path, "w") as target:
+        for item in source.infolist():
+            if item.filename in {"word/numbering.xml", "word/_rels/document.xml.rels"}:
+                if item.filename == "word/_rels/document.xml.rels":
+                    relationships = source.read(item.filename).decode("utf-8")
+                    relationships = relationships.replace(
+                        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>',
+                        "",
+                    )
+                    target.writestr(item, relationships.encode("utf-8"))
+                continue
+            target.writestr(item, source.read(item.filename))
+    temporary_path.replace(path)
+
+
 def test_convert_string_basic():
     """Test basic string conversion."""
     converter = Converter()
@@ -352,6 +370,64 @@ def test_word_template_preserves_headers_footers_media_and_geometry(tmp_path):
     ):
         assert getattr(output_section, attribute) == getattr(template_section, attribute)
     assert output.settings.odd_and_even_pages_header_footer is True
+
+
+def test_word_template_without_numbering_part_still_converts(tmp_path):
+    """A header-only template without numbering.xml should remain usable."""
+    template_path = tmp_path / "header-only.docx"
+    output_path = tmp_path / "output.docx"
+    template = Document()
+    template.sections[0].header.paragraphs[0].add_run("Template header")
+    template.save(template_path)
+    _remove_numbering_part(template_path)
+
+    Converter(word_template=str(template_path)).convert_string(
+        "# Generated heading\n\nGenerated body.",
+        str(output_path),
+    )
+
+    output = Document(output_path)
+    assert "Generated body." in [paragraph.text for paragraph in output.paragraphs]
+    assert output.sections[0].header.paragraphs[0].text == "Template header"
+
+
+def test_word_template_without_numbering_part_supports_ordered_lists(tmp_path):
+    """Missing numbering definitions should be created when a list needs them."""
+    template_path = tmp_path / "header-only.docx"
+    output_path = tmp_path / "output.docx"
+    template = Document()
+    template.sections[0].header.paragraphs[0].add_run("Template header")
+    template.save(template_path)
+    _remove_numbering_part(template_path)
+
+    Converter(word_template=str(template_path)).convert_string(
+        "1. First\n2. Second",
+        str(output_path),
+    )
+
+    output = Document(output_path)
+    assert [paragraph.text for paragraph in output.paragraphs] == ["First", "Second"]
+    with ZipFile(output_path) as archive:
+        assert "word/numbering.xml" in archive.namelist()
+        assert b"<w:numPr>" in archive.read("word/document.xml")
+
+
+def test_word_template_without_numbering_part_supports_bullet_lists(tmp_path):
+    """Missing numbering definitions should not block default bullet lists."""
+    template_path = tmp_path / "header-only.docx"
+    output_path = tmp_path / "output.docx"
+    template = Document()
+    template.sections[0].header.paragraphs[0].add_run("Template header")
+    template.save(template_path)
+    _remove_numbering_part(template_path)
+
+    Converter(word_template=str(template_path)).convert_string(
+        "* First\n* Second",
+        str(output_path),
+    )
+
+    output = Document(output_path)
+    assert [paragraph.text for paragraph in output.paragraphs] == ["•\tFirst", "•\tSecond"]
 
 
 def test_word_template_rejects_missing_file(tmp_path):

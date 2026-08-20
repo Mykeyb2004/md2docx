@@ -583,6 +583,14 @@ def test_gui_conversion_uses_saved_config_not_dirty_draft(monkeypatch):
     ]
 
 
+def test_gui_formats_empty_conversion_errors_with_exception_type():
+    """The UI should show a useful type when an exception has no message."""
+    assert Md2docxGUI.format_conversion_error(NotImplementedError()) == "NotImplementedError"
+    assert Md2docxGUI.format_conversion_error(ValueError("bad template")) == (
+        "ValueError: bad template"
+    )
+
+
 def test_gui_close_preserves_root_when_editor_close_is_cancelled():
     """Closing the app must honor a config editor's cancel decision."""
     gui = Md2docxGUI.__new__(Md2docxGUI)
