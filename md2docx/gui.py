@@ -34,6 +34,7 @@ FIELD_WIDGET_COMBOBOX = "combobox"
 FIELD_WIDGET_COLOR = "color"
 
 APP_ICON_RELATIVE_PATH = Path("assets") / "macos" / "AppIcon.png"
+WORD_TEMPLATE_HISTORY_LIMIT = 10
 
 
 def app_icon_png_path() -> Path:
@@ -1459,8 +1460,9 @@ class Md2docxGUI:
         self.preferences_file = app_state_dir / "preferences.json"
         (
             self.last_word_template_path,
+            self.word_template_history,
             self.startup_word_template_error,
-        ) = self.load_last_word_template()
+        ) = self.load_word_template_state()
         self.packaged_default_config = StyleManager.load_packaged_template("default")
         self.config_editor: Optional[ConfigEditorWindow] = None
         self.config_document, self.startup_config_error = self.load_initial_config_document()
@@ -1580,7 +1582,13 @@ class Md2docxGUI:
         )
         output_btn.grid(row=1, column=2, padx=5)
 
-        ttk.Label(conv_frame, text="Word 模板：").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.use_word_template_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            conv_frame,
+            text="使用 Word 模板",
+            variable=self.use_word_template_var,
+        ).grid(row=2, column=0, sticky=tk.W, pady=5)
+
         self.word_template_var = tk.StringVar(
             value=(
                 str(self.last_word_template_path)
@@ -1588,13 +1596,23 @@ class Md2docxGUI:
                 else ""
             )
         )
-        template_entry = ttk.Entry(
+        self.word_template_combobox = ttk.Combobox(
             conv_frame,
             textvariable=self.word_template_var,
+            values=list(getattr(self, "word_template_history", [])),
             width=50,
             state="readonly",
         )
-        template_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=5)
+        self.word_template_combobox.grid(
+            row=2,
+            column=1,
+            sticky=(tk.W, tk.E),
+            padx=5,
+        )
+        self.word_template_combobox.bind(
+            "<<ComboboxSelected>>",
+            self.select_word_template_from_history,
+        )
 
         ttk.Button(
             conv_frame,
@@ -1745,6 +1763,30 @@ class Md2docxGUI:
         if filename:
             self.output_var.set(filename)
 
+    def remember_word_template(self, template_path: Path) -> bool:
+        """Select a template, promote it in history, and persist the state."""
+        normalized_path = template_path.expanduser()
+        self.last_word_template_path = normalized_path
+        self.word_template_var.set(str(normalized_path))
+        saved = self.save_last_word_template_path(normalized_path)
+
+        combobox = getattr(self, "word_template_combobox", None)
+        if combobox is not None:
+            combobox.configure(values=list(self.word_template_history))
+        return saved
+
+    def select_word_template_from_history(self, _event: Any = None) -> None:
+        """Promote the template chosen from the history combobox."""
+        selected_path = self.word_template_var.get().strip()
+        if not selected_path:
+            return
+        if not self.remember_word_template(Path(selected_path)):
+            messagebox.showwarning(
+                "偏好保存失败",
+                "Word模板已选择，但无法更新模板历史。",
+                parent=self.dialog_parent(),
+            )
+
     def browse_word_template(self) -> None:
         """Open a file dialog to select an optional Word document template."""
         filename = filedialog.askopenfilename(
@@ -1755,21 +1797,15 @@ class Md2docxGUI:
                 ("All files", "*.*"),
             ],
         )
-        if filename:
-            template_path = Path(filename).expanduser()
-            self.word_template_var.set(str(template_path))
-            self.last_word_template_path = template_path
-            if hasattr(self, "preferences_file") and not self.save_last_word_template_path(
-                template_path
-            ):
-                messagebox.showwarning(
-                    "偏好保存失败",
-                    "Word模板已选择，但无法记录为下次启动模板。",
-                    parent=self.dialog_parent(),
-                )
+        if filename and not self.remember_word_template(Path(filename)):
+            messagebox.showwarning(
+                "偏好保存失败",
+                "Word模板已选择，但无法记录为下次启动模板。",
+                parent=self.dialog_parent(),
+            )
 
     def clear_word_template(self) -> None:
-        """Clear the optional Word document template selection."""
+        """Clear the current template selection without deleting its history."""
         self.word_template_var.set("")
         self.last_word_template_path = None
         if hasattr(self, "preferences_file") and not self.clear_last_word_template_path():
@@ -1872,27 +1908,86 @@ class Md2docxGUI:
 
     def load_last_word_template(self) -> Tuple[Optional[Path], Optional[str]]:
         """Load the remembered template and describe a stale or invalid path."""
-        raw_path = self.load_preferences().get("last_word_template_path")
-        if not isinstance(raw_path, str) or not raw_path.strip():
-            return None, None
+        template_path, _history, warning = self.load_word_template_state()
+        return template_path, warning
 
-        template_path = Path(raw_path).expanduser()
+    @staticmethod
+    def normalize_word_template_history(
+        raw_history: Any, current_path: Optional[Path] = None
+    ) -> List[str]:
+        """Normalize remembered Word template paths while preserving recency order."""
+        candidates: List[Any] = []
+        if current_path is not None:
+            try:
+                candidates.append(str(current_path.expanduser()))
+            except RuntimeError:
+                pass
+        if isinstance(raw_history, list):
+            candidates.extend(raw_history)
+
+        history: List[str] = []
+        seen = set()
+        for candidate in candidates:
+            if not isinstance(candidate, str) or not candidate.strip():
+                continue
+            try:
+                normalized = str(Path(candidate).expanduser())
+            except RuntimeError:
+                continue
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            history.append(normalized)
+            if len(history) >= WORD_TEMPLATE_HISTORY_LIMIT:
+                break
+        return history
+
+    def load_word_template_state(
+        self,
+    ) -> Tuple[Optional[Path], List[str], Optional[str]]:
+        """Load the remembered template path, normalized history, and any warning."""
+        preferences = self.load_preferences()
+        raw_path = preferences.get("last_word_template_path")
+        template_path: Optional[Path] = None
+        if isinstance(raw_path, str) and raw_path.strip():
+            try:
+                template_path = Path(raw_path).expanduser()
+            except RuntimeError:
+                pass
+
+        history = self.normalize_word_template_history(
+            preferences.get("word_template_history"), template_path
+        )
+        if template_path is None:
+            return None, history, None
         if template_path.suffix.lower() != ".docx":
-            return template_path, f"上次记录的模板不是 .docx 文件：{template_path}"
+            return template_path, history, f"上次记录的模板不是 .docx 文件：{template_path}"
         if not template_path.is_file():
-            return template_path, f"上次记录的模板不存在：{template_path}"
-        return template_path, None
+            return template_path, history, f"上次记录的模板不存在：{template_path}"
+        return template_path, history, None
 
     def save_last_word_template_path(self, template_path: Path) -> bool:
         """Merge and persist the selected Word template path."""
         preferences = self.load_preferences()
-        preferences["last_word_template_path"] = str(template_path.expanduser())
+        selected_path = template_path.expanduser()
+        raw_history = getattr(
+            self,
+            "word_template_history",
+            preferences.get("word_template_history"),
+        )
+        self.word_template_history = self.normalize_word_template_history(
+            raw_history, selected_path
+        )
+        preferences["last_word_template_path"] = str(selected_path)
+        preferences["word_template_history"] = list(self.word_template_history)
         return self.save_preferences(preferences)
 
     def clear_last_word_template_path(self) -> bool:
         """Remove only the remembered Word template preference."""
         preferences = self.load_preferences()
         preferences.pop("last_word_template_path", None)
+        if hasattr(self, "word_template_history"):
+            preferences["word_template_history"] = list(self.word_template_history)
         return self.save_preferences(preferences)
 
     def load_last_config_path(self) -> Optional[Path]:
@@ -1935,9 +2030,13 @@ class Md2docxGUI:
         return clone_config(self.config_document.saved_config)
 
     def selected_word_template(self) -> str:
-        """Return the selected Word template without requiring a fully built GUI."""
-        variable = getattr(self, "word_template_var", None)
-        return variable.get().strip() if variable is not None else ""
+        """Return the selected template only when template use is enabled."""
+        enabled_variable = getattr(self, "use_word_template_var", None)
+        if enabled_variable is not None and not enabled_variable.get():
+            return ""
+
+        template_variable = getattr(self, "word_template_var", None)
+        return template_variable.get().strip() if template_variable is not None else ""
 
     def convert_file(self) -> None:
         """Convert Markdown file to Word document."""
