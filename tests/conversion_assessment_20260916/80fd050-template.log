@@ -1,0 +1,17 @@
+{
+  "version": "80fd050",
+  "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/80fd050",
+  "mode": "template",
+  "cases": {
+    "mermaid": {
+      "error": "NotImplementedError: ",
+      "pass": false
+    },
+    "formulas": {
+      "error": "NotImplementedError: ",
+      "pass": false
+    }
+  },
+  "external_commands": []
+}
+

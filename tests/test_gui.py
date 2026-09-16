@@ -1095,9 +1095,14 @@ def test_gui_invalid_browse_keeps_document_and_preference(tmp_path: Path, monkey
 
 def test_gui_conversion_uses_saved_config_not_dirty_draft(monkeypatch):
     """Conversions must ignore unsaved editor values."""
+    from md2docx.mermaid_converter import MermaidReport
+    from md2docx.omml_converter import FormulaReport
     captured = {}
 
     class FakeConverter:
+        mermaid_report = MermaidReport()
+        formula_report = FormulaReport()
+
         def __init__(
             self,
             *,

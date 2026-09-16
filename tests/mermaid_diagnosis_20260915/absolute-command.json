@@ -1,0 +1,13 @@
+{
+  "mode": "absolute-command",
+  "expected": 1,
+  "body_drawings": 0,
+  "raw_code_paragraphs": 1,
+  "failures": [
+    {
+      "diagram": 1,
+      "line": 122
+    }
+  ],
+  "output": "/Users/zhangqijin/PycharmProjects/md2docx/tests/mermaid_diagnosis_20260915/absolute-command.docx"
+}

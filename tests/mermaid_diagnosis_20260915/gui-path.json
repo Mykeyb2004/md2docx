@@ -1,0 +1,8 @@
+{
+  "mode": "gui-path",
+  "expected": 1,
+  "body_drawings": 0,
+  "raw_code_paragraphs": 1,
+  "failures": [],
+  "output": "/Users/zhangqijin/PycharmProjects/md2docx/tests/mermaid_diagnosis_20260915/gui-path.docx"
+}

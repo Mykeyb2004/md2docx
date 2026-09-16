@@ -1,0 +1,41 @@
+{
+  "mode": "full",
+  "expected": 90,
+  "body_drawings": 82,
+  "raw_code_paragraphs": 8,
+  "failures": [
+    {
+      "diagram": 21,
+      "line": 3150
+    },
+    {
+      "diagram": 33,
+      "line": 4456
+    },
+    {
+      "diagram": 42,
+      "line": 5444
+    },
+    {
+      "diagram": 54,
+      "line": 6836
+    },
+    {
+      "diagram": 65,
+      "line": 8363
+    },
+    {
+      "diagram": 83,
+      "line": 10619
+    },
+    {
+      "diagram": 84,
+      "line": 10752
+    },
+    {
+      "diagram": 88,
+      "line": 11170
+    }
+  ],
+  "output": "/Users/zhangqijin/PycharmProjects/md2docx/tests/mermaid_diagnosis_20260915/full.docx"
+}

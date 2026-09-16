@@ -1,0 +1,83 @@
+{
+  "version": "current",
+  "source": "/Users/zhangqijin/PycharmProjects/md2docx",
+  "mode": "template",
+  "cases": {
+    "mermaid": {
+      "error": "AttributeError: 'MermaidReport' object has no attribute 'rendered'",
+      "pass": false
+    },
+    "formulas": {
+      "error": "AttributeError: 'MermaidReport' object has no attribute 'rendered'",
+      "pass": false
+    }
+  },
+  "external_commands": [
+    [
+      "/Users/zhangqijin/.nvm/versions/node/v26.4.0/bin/mmdc",
+      "-i",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpcz4ewk4a/diagram.mmd",
+      "-o",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpcz4ewk4a/diagram.png",
+      "-b",
+      "white",
+      "-c",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpcz4ewk4a/mermaid-config.json"
+    ],
+    [
+      "/usr/local/bin/pandoc",
+      "-f",
+      "markdown+tex_math_dollars",
+      "-t",
+      "docx",
+      "-o",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-i2u37y07/math.docx"
+    ],
+    [
+      "/usr/local/bin/pandoc",
+      "-f",
+      "markdown+tex_math_dollars",
+      "-t",
+      "docx",
+      "-o",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-faupopkw/math.docx"
+    ],
+    [
+      "/usr/local/bin/pandoc",
+      "-f",
+      "markdown+tex_math_dollars",
+      "-t",
+      "docx",
+      "-o",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-5r7c5cax/math.docx"
+    ],
+    [
+      "/usr/local/bin/pandoc",
+      "-f",
+      "markdown+tex_math_dollars",
+      "-t",
+      "docx",
+      "-o",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-__y469ig/math.docx"
+    ],
+    [
+      "/usr/local/bin/pandoc",
+      "-f",
+      "markdown+tex_math_dollars",
+      "-t",
+      "docx",
+      "-o",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-kzdojxv2/math.docx"
+    ],
+    [
+      "/usr/local/bin/pandoc",
+      "-f",
+      "markdown+tex_math_dollars",
+      "-t",
+      "docx",
+      "-o",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-t6a_sl4j/math.docx"
+    ]
+  ]
+}
+

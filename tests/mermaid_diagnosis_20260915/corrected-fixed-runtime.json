@@ -1,0 +1,16 @@
+{
+  "case": "corrected-fixed-runtime",
+  "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+  "output": "/Users/zhangqijin/PycharmProjects/md2docx/tests/mermaid_diagnosis_20260915/corrected-fixed-runtime.docx",
+  "drawings": 90,
+  "mermaid": {
+    "total": 90,
+    "failures": []
+  },
+  "formula": {
+    "total": 0,
+    "native": 0,
+    "fallbacks": [],
+    "failures": []
+  }
+}

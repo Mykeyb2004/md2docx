@@ -1,0 +1,49 @@
+{
+  "case": "original-fixed-runtime",
+  "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+  "output": "/Users/zhangqijin/PycharmProjects/md2docx/tests/mermaid_diagnosis_20260915/original-fixed-runtime.docx",
+  "drawings": 82,
+  "mermaid": {
+    "total": 90,
+    "failures": [
+      {
+        "index": 21,
+        "error": "Error: Lexical error on line 6. Unrecognized text.\n...资源匹配}    E -- 政策保障 --F[对接政府救助政策]    E \n----------------------^\nParser3.parseError (/Users/zhangqijin/.nvm/versions/node/v26.4.0/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/mermaid/dist/mermaid.js:104416:28)"
+      },
+      {
+        "index": 33,
+        "error": "Error: Lexical error on line 3. Unrecognized text.\n...类}    B -- 政策咨询/宣介 -- C[现场解答/发放宣传册]   \n----------------------^\nParser3.parseError (/Users/zhangqijin/.nvm/versions/node/v26.4.0/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/mermaid/dist/mermaid.js:104416:28)"
+      },
+      {
+        "index": 42,
+        "error": "Error: Lexical error on line 3. Unrecognized text.\n...研判}    B -- 属于辅助事务 -- > C[标准流程办理与反馈]  \n----------------------^\nParser3.parseError (/Users/zhangqijin/.nvm/versions/node/v26.4.0/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/mermaid/dist/mermaid.js:104416:28)"
+      },
+      {
+        "index": 54,
+        "error": "Error: Lexical error on line 12. Unrecognized text.\n...--> J[归档至权益维护专项档案库]]\n----------------------^\nParser3.parseError (/Users/zhangqijin/.nvm/versions/node/v26.4.0/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/mermaid/dist/mermaid.js:104416:28)"
+      },
+      {
+        "index": 65,
+        "error": "Error: Lexical error on line 4. Unrecognized text.\n...    C -- 一般缺陷/24小时 -- > D[下发整改通知单]    \n----------------------^\nParser3.parseError (/Users/zhangqijin/.nvm/versions/node/v26.4.0/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/mermaid/dist/mermaid.js:104416:28)"
+      },
+      {
+        "index": 83,
+        "error": "Error: Lexical error on line 3. Unrecognized text.\n...}    B -- 不符合或无补位人 --|退回| A    B -- 符合\n----------------------^\nParser3.parseError (/Users/zhangqijin/.nvm/versions/node/v26.4.0/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/mermaid/dist/mermaid.js:104416:28)"
+      },
+      {
+        "index": 84,
+        "error": "Error: Lexical error on line 3. Unrecognized text.\n...判断}    B -- 请休假/疾病 --C[项目负责人启动补位]    B\n----------------------^\nParser3.parseError (/Users/zhangqijin/.nvm/versions/node/v26.4.0/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/mermaid/dist/mermaid.js:104416:28)"
+      },
+      {
+        "index": 88,
+        "error": "Error: Lexical error on line 3. Unrecognized text.\n...长预判}    B -- 4小时以内 --|触发三级响应| C[现场B角人员直\n----------------------^\nParser3.parseError (/Users/zhangqijin/.nvm/versions/node/v26.4.0/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/mermaid/dist/mermaid.js:104416:28)"
+      }
+    ]
+  },
+  "formula": {
+    "total": 0,
+    "native": 0,
+    "fallbacks": [],
+    "failures": []
+  }
+}

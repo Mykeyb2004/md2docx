@@ -16,7 +16,7 @@ from md2docx.styles import StyleManager
 def _install_fake_mermaid_cli(monkeypatch, captured):
     """Stub subprocess.run so tests can inspect the generated CLI command."""
 
-    def fake_run(command, check, capture_output, text):
+    def fake_run(command, check, capture_output, text, env):
         captured["command"] = command
         output_path = Path(command[command.index("-o") + 1])
         output_path.write_bytes(b"png-bytes")
@@ -28,6 +28,9 @@ def _install_fake_mermaid_cli(monkeypatch, captured):
         return SimpleNamespace(returncode=0, stderr="", stdout="")
 
     monkeypatch.setattr(mermaid_converter_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        MermaidConverter, "_command_environment", lambda self: ("mmdc", {"PATH": "/test"}),
+    )
 
 
 def test_mermaid_converter_passes_theme_flag_without_custom_variables(monkeypatch, tmp_path):

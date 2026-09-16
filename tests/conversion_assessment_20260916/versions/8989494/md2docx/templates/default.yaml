@@ -1,0 +1,144 @@
+# Default style configuration for md2docx
+
+# Document-level settings
+document:
+  page_size: A4
+  margin_top: 2.54cm
+  margin_bottom: 2.54cm
+  margin_left: 3.17cm
+  margin_right: 3.17cm
+  line_spacing: 1.5
+
+# Heading styles (levels 1-4)
+heading1:
+  font_name: "方正小标宋简体"
+  font_size: 22pt
+  font_color: "#000080"  # Dark blue
+  bold: true
+  space_before: 6pt
+  space_after: 6pt
+  alignment: center
+
+heading2:
+  font_name: "黑体"
+  font_size: 16pt
+  font_color: "#000000"
+  bold: true
+  space_before: 6pt
+  space_after: 6pt
+  alignment: left
+  first_line_indent: 2
+
+heading3:
+  font_name: "楷体"
+  font_size: 16pt
+  font_color: "#000000"
+  bold: true
+  space_before: 6pt
+  space_after: 6pt
+  alignment: left
+  first_line_indent: 2
+
+heading4:
+  font_name: "仿宋"
+  font_size: 14pt
+  font_color: "#000000"
+  italic: false  # 斜体
+  space_before: 3pt
+  space_after: 3pt
+  alignment: left
+  first_line_indent: 2
+
+# Paragraph style
+paragraph:
+  font_name: "仿宋"
+  font_size: 14pt
+  line_spacing: 1.5
+  first_line_indent: 2  # characters (中文规范：首行缩进2个字符)
+  alignment: justify  # left, right, center, justify
+  space_before: 0pt  # 段前间距
+  space_after: 0pt   # 段后间距
+
+# Inline text formatting (Markdown emphasis)
+inline:
+  # 粗体文本 (**text** 或 __text__)
+  bold:
+    font_color: null  # null 表示继承父级颜色，也可设置如 "#000000"
+  # 斜体文本 (*text* 或 _text_)
+  italic:
+    font_color: null  # null 表示继承父级颜色
+  # 行内代码 (`code`)
+  code:
+    font_name: "Consolas"
+    font_size: 11pt
+    font_color: "#D14"  # 红色
+    background: "#F5F5F5"  # 浅灰色背景
+
+# Code block style (```code```)
+code_block:
+  font_name: " 宋体"
+  font_size: 14pt
+  bold: true
+  font_color: "#24292E"  # GitHub 深灰色
+  background: "#F6F8FA"  # GitHub 浅灰背景
+  border_color: "#D0D7DE"  # 边框颜色
+  line_spacing: 1.5
+  space_before: 6pt
+  space_after: 6pt
+  padding: 12pt  # 内边距
+
+# Table style
+table:
+  style: "Light Grid Accent 1"
+  font_name: "仿宋"
+  font_size: 12pt
+  line_spacing: 1.5
+  header_bold: true
+  header_background: "#F2F2F2"
+  border_color: "#CCCCCC"
+  alignment: left
+  # 斑马纹/交替行颜色（可选）
+  alternating_rows: false  # 是否启用交替行颜色
+  row_background_odd: "#FFFFFF"   # 奇数行背景色
+  row_background_even: "#F9F9F9"  # 偶数行背景色（浅灰）
+
+# List style
+list:
+  font_name: "仿宋"
+  font_size: 14pt
+  line_spacing: 1.5
+  bullet_char: "•"
+  number_format: "1."
+  indent_size: 0.5in
+  space_after: 3pt
+
+# Math formula style (rendered as images)
+math_inline:
+  height: 0.15in  # 行内公式图片高度
+  dpi: 300        # 渲染分辨率
+
+math_block:
+  width: 4in      # 块级公式图片宽度 
+  alignment: center
+  space_before: 6pt
+  space_after: 6pt
+  dpi: 300        # 渲染分辨率
+
+# Mermaid diagram style (rendered via Mermaid CLI)
+mermaid:
+  command: mmdc
+  format: png
+  width: 5.5in
+  alignment: center
+  space_before: 6pt
+  space_after: 6pt
+  background_color: white
+  soft_max_height_ratio: 0.68
+  hard_max_height_ratio: 0.82
+  page_max_height_ratio: 0.92
+  page_break_threshold_ratio: 0.90
+  min_readable_width: 3.2in
+  oversized_strategy: page
+  keep_together: true
+  keep_with_next: false
+  widow_control: false

@@ -1,0 +1,8 @@
+{
+  "mode": "corrected",
+  "expected": 90,
+  "body_drawings": 90,
+  "raw_code_paragraphs": 0,
+  "failures": [],
+  "output": "/Users/zhangqijin/PycharmProjects/md2docx/tests/mermaid_diagnosis_20260915/corrected.docx"
+}

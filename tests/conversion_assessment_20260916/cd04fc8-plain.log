@@ -1,0 +1,88 @@
+{
+  "version": "cd04fc8",
+  "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/cd04fc8",
+  "mode": "plain",
+  "cases": {
+    "mermaid": {
+      "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/cd04fc8-plain/mermaid.docx",
+      "drawings": 1,
+      "inline_pictures": 1,
+      "floating_pictures": 0,
+      "pictures": [
+        {
+          "height_pt": 418.22448818897635,
+          "line_rule": "auto",
+          "style": "Normal",
+          "direct_line": [],
+          "style_line": []
+        }
+      ],
+      "equations": 0,
+      "display_equations": 0,
+      "fractions": 0,
+      "radicals": 0,
+      "nary": 0,
+      "document_protection": 0,
+      "pass": true
+    },
+    "formulas": {
+      "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/cd04fc8-plain/formulas.docx",
+      "drawings": 5,
+      "inline_pictures": 5,
+      "floating_pictures": 0,
+      "pictures": [
+        {
+          "height_pt": 10.8,
+          "line_rule": "auto",
+          "style": "Normal",
+          "direct_line": [
+            "360"
+          ],
+          "style_line": []
+        },
+        {
+          "height_pt": 90.92149606299212,
+          "line_rule": "auto",
+          "style": "Normal",
+          "direct_line": [],
+          "style_line": []
+        },
+        {
+          "height_pt": 142.8,
+          "line_rule": "auto",
+          "style": "Normal",
+          "direct_line": [],
+          "style_line": []
+        },
+        {
+          "height_pt": 132.23078740157482,
+          "line_rule": "auto",
+          "style": "Normal",
+          "direct_line": [],
+          "style_line": []
+        }
+      ],
+      "equations": 0,
+      "display_equations": 0,
+      "fractions": 0,
+      "radicals": 0,
+      "nary": 0,
+      "document_protection": 0,
+      "pass": false
+    }
+  },
+  "external_commands": [
+    [
+      "mmdc",
+      "-i",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp3itjfpot/diagram.mmd",
+      "-o",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp3itjfpot/diagram.png",
+      "-b",
+      "white",
+      "-c",
+      "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp3itjfpot/mermaid-config.json"
+    ]
+  ]
+}
+
