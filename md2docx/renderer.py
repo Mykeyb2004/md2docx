@@ -914,6 +914,8 @@ class DocxRenderer(mistune.BaseRenderer):
         """
         p = self.doc.add_paragraph()
         p.alignment = self._get_alignment(alignment)
+        # Inline images need their full height, even if Normal uses fixed spacing.
+        p.paragraph_format.line_spacing = 1.0
 
         run = p.add_run()
         image_kwargs = {}

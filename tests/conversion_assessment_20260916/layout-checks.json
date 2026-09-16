@@ -1,0 +1,14 @@
+[
+  {
+    "file": "current-template.docx",
+    "exit_code": 1,
+    "stdout": "{\n  \"file\": \"tests/conversion_assessment_20260916/current-template.docx\",\n  \"pictures\": [\n    {\n      \"image_height_pt\": 418.22448818897635,\n      \"line_rule\": \"exact\",\n      \"fixed_line_pt\": 28.0,\n      \"clipped\": true\n    }\n  ]\n}\n",
+    "stderr": "Traceback (most recent call last):\n  File \"/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/check_layout.py\", line 26, in <module>\n    assert not any(row['clipped'] for row in rows), 'Inline image exceeds inherited fixed line height'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Inline image exceeds inherited fixed line height\n"
+  },
+  {
+    "file": "spacing-only-control.docx",
+    "exit_code": 0,
+    "stdout": "{\n  \"file\": \"tests/conversion_assessment_20260916/spacing-only-control.docx\",\n  \"pictures\": [\n    {\n      \"image_height_pt\": 418.22448818897635,\n      \"line_rule\": \"auto\",\n      \"fixed_line_pt\": null,\n      \"clipped\": false\n    }\n  ]\n}\n",
+    "stderr": ""
+  }
+]

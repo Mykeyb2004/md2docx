@@ -1,0 +1,85 @@
+{
+  "version": "022ef8b-gui",
+  "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/022ef8b",
+  "mode": "template",
+  "cases": {
+    "mermaid": {
+      "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-gui-template/mermaid.docx",
+      "drawings": 0,
+      "inline_pictures": 0,
+      "floating_pictures": 0,
+      "pictures": [],
+      "equations": 0,
+      "display_equations": 0,
+      "fractions": 0,
+      "radicals": 0,
+      "nary": 0,
+      "document_protection": 0,
+      "pass": false
+    },
+    "formulas": {
+      "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-gui-template/formulas.docx",
+      "drawings": 6,
+      "inline_pictures": 6,
+      "floating_pictures": 0,
+      "pictures": [
+        {
+          "height_pt": 10.8,
+          "line_rule": "auto",
+          "style": "Normal",
+          "direct_line": [
+            "360"
+          ],
+          "style_line": [
+            "560"
+          ]
+        },
+        {
+          "height_pt": 90.92149606299212,
+          "line_rule": "exact",
+          "style": "Normal",
+          "direct_line": [],
+          "style_line": [
+            "560"
+          ]
+        },
+        {
+          "height_pt": 142.8,
+          "line_rule": "exact",
+          "style": "Normal",
+          "direct_line": [],
+          "style_line": [
+            "560"
+          ]
+        },
+        {
+          "height_pt": 132.23078740157482,
+          "line_rule": "exact",
+          "style": "Normal",
+          "direct_line": [],
+          "style_line": [
+            "560"
+          ]
+        },
+        {
+          "height_pt": 121.97645669291339,
+          "line_rule": "exact",
+          "style": "Normal",
+          "direct_line": [],
+          "style_line": [
+            "560"
+          ]
+        }
+      ],
+      "equations": 0,
+      "display_equations": 0,
+      "fractions": 0,
+      "radicals": 0,
+      "nary": 0,
+      "document_protection": 0,
+      "pass": false
+    }
+  },
+  "external_commands": []
+}
+

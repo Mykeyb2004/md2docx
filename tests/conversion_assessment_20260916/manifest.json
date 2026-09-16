@@ -1,0 +1,31 @@
+{
+  "head": "d2d6262b6b2b4119d74eeb95adaa7eac8476a2da",
+  "packages": {
+    "python-docx": "1.2.0",
+    "mistune": "3.1.4",
+    "lxml": "6.0.2",
+    "Pillow": "12.0.0",
+    "PyYAML": "6.0.3"
+  },
+  "files": {
+    "/Users/zhangqijin/Documents/Field/素材/word模板/Doc1.docx": {
+      "sha256": "c96f6281a265d8608960c6cb1a22cd6d04f0616e05b15804c0909ff64a498aa6"
+    },
+    "/Users/zhangqijin/Desktop/桌面文件/md2docx简单表格配置.yml": {
+      "sha256": "1e902acd02c81a5e3f6c13386a0b939b74ebfccac04ffe78baf53f528bae5f0d"
+    },
+    "tests/conversion_assessment_20260916/screenshot-excerpt.md": {
+      "sha256": "f40d17eb02b5ad42beaadb561463ee21927b7c80737d19aa062127af0f473095"
+    },
+    "tests/conversion_assessment_20260916/formulas.md": {
+      "sha256": "38fe039d13bedcccb698cba7947bfdf612cbf3ded7360f88a1d14fca220d19fe"
+    }
+  },
+  "image_helper_ast_identical": true,
+  "control_changed_package_entries": [
+    "word/document.xml"
+  ],
+  "control_only_changed_image_paragraph_line_spacing": true,
+  "initial_head": "022ef8b1b8f6c2b9271b8b04c6e13b3bc4d846be",
+  "head_note": "HEAD advanced externally during assessment; product source remained unchanged by this task."
+}

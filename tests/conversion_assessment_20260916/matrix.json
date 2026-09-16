@@ -1,35 +1,27 @@
 [
   {
-    "version": "cd04fc8",
-    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/cd04fc8",
-    "mode": "plain",
+    "version": "022ef8b-gui",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/022ef8b",
+    "mode": "template",
     "cases": {
       "mermaid": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/cd04fc8-plain/mermaid.docx",
-        "drawings": 1,
-        "inline_pictures": 1,
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-gui-template/mermaid.docx",
+        "drawings": 0,
+        "inline_pictures": 0,
         "floating_pictures": 0,
-        "pictures": [
-          {
-            "height_pt": 418.22448818897635,
-            "line_rule": "auto",
-            "style": "Normal",
-            "direct_line": [],
-            "style_line": []
-          }
-        ],
+        "pictures": [],
         "equations": 0,
         "display_equations": 0,
         "fractions": 0,
         "radicals": 0,
         "nary": 0,
         "document_protection": 0,
-        "pass": true
+        "pass": false
       },
       "formulas": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/cd04fc8-plain/formulas.docx",
-        "drawings": 5,
-        "inline_pictures": 5,
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-gui-template/formulas.docx",
+        "drawings": 6,
+        "inline_pictures": 6,
         "floating_pictures": 0,
         "pictures": [
           {
@@ -39,28 +31,45 @@
             "direct_line": [
               "360"
             ],
-            "style_line": []
+            "style_line": [
+              "560"
+            ]
           },
           {
             "height_pt": 90.92149606299212,
-            "line_rule": "auto",
+            "line_rule": "exact",
             "style": "Normal",
             "direct_line": [],
-            "style_line": []
+            "style_line": [
+              "560"
+            ]
           },
           {
             "height_pt": 142.8,
-            "line_rule": "auto",
+            "line_rule": "exact",
             "style": "Normal",
             "direct_line": [],
-            "style_line": []
+            "style_line": [
+              "560"
+            ]
           },
           {
             "height_pt": 132.23078740157482,
-            "line_rule": "auto",
+            "line_rule": "exact",
             "style": "Normal",
             "direct_line": [],
-            "style_line": []
+            "style_line": [
+              "560"
+            ]
+          },
+          {
+            "height_pt": 121.97645669291339,
+            "line_rule": "exact",
+            "style": "Normal",
+            "direct_line": [],
+            "style_line": [
+              "560"
+            ]
           }
         ],
         "equations": 0,
@@ -72,27 +81,15 @@
         "pass": false
       }
     },
-    "external_commands": [
-      [
-        "mmdc",
-        "-i",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp3itjfpot/diagram.mmd",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp3itjfpot/diagram.png",
-        "-b",
-        "white",
-        "-c",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp3itjfpot/mermaid-config.json"
-      ]
-    ]
+    "external_commands": []
   },
   {
-    "version": "d14566d",
-    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/d14566d",
+    "version": "022ef8b",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/022ef8b",
     "mode": "plain",
     "cases": {
       "mermaid": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/d14566d-plain/mermaid.docx",
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-plain/mermaid.docx",
         "drawings": 1,
         "inline_pictures": 1,
         "floating_pictures": 0,
@@ -114,7 +111,7 @@
         "pass": true
       },
       "formulas": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/d14566d-plain/formulas.docx",
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-plain/formulas.docx",
         "drawings": 0,
         "inline_pictures": 0,
         "floating_pictures": 0,
@@ -132,13 +129,13 @@
       [
         "mmdc",
         "-i",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpi33ny6ht/diagram.mmd",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp85wlr1ya/diagram.mmd",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpi33ny6ht/diagram.png",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp85wlr1ya/diagram.png",
         "-b",
         "white",
         "-c",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpi33ny6ht/mermaid-config.json"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp85wlr1ya/mermaid-config.json"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -147,7 +144,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-gjq8bd2p/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-jkveshah/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -156,7 +153,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-rva__bx3/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-49e_8owl/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -165,7 +162,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-p4k7lksv/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-9cr0sd94/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -174,7 +171,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-nl0lvz1l/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-8dyuia9_/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -183,7 +180,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-81_px_li/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-qkp0s5lg/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -192,7 +189,341 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-rke66tn7/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-a2bu77tq/math.docx"
+      ]
+    ]
+  },
+  {
+    "version": "022ef8b",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/022ef8b",
+    "mode": "template",
+    "cases": {
+      "mermaid": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-template/mermaid.docx",
+        "drawings": 1,
+        "inline_pictures": 1,
+        "floating_pictures": 0,
+        "pictures": [
+          {
+            "height_pt": 418.22448818897635,
+            "line_rule": "exact",
+            "style": "Normal",
+            "direct_line": [],
+            "style_line": [
+              "560"
+            ]
+          }
+        ],
+        "equations": 0,
+        "display_equations": 0,
+        "fractions": 0,
+        "radicals": 0,
+        "nary": 0,
+        "document_protection": 0,
+        "pass": false
+      },
+      "formulas": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-template/formulas.docx",
+        "drawings": 0,
+        "inline_pictures": 0,
+        "floating_pictures": 0,
+        "pictures": [],
+        "equations": 6,
+        "display_equations": 4,
+        "fractions": 5,
+        "radicals": 1,
+        "nary": 2,
+        "document_protection": 0,
+        "pass": true
+      }
+    },
+    "external_commands": [
+      [
+        "mmdc",
+        "-i",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpo32ekob9/diagram.mmd",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpo32ekob9/diagram.png",
+        "-b",
+        "white",
+        "-c",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpo32ekob9/mermaid-config.json"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-khvn0pku/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-diip_bvp/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-4oiq4_72/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-cmooaj7p/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-bcc4otbx/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-hs2c13tf/math.docx"
+      ]
+    ]
+  },
+  {
+    "version": "1eeb7e7",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/1eeb7e7",
+    "mode": "plain",
+    "cases": {
+      "mermaid": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/1eeb7e7-plain/mermaid.docx",
+        "drawings": 1,
+        "inline_pictures": 1,
+        "floating_pictures": 0,
+        "pictures": [
+          {
+            "height_pt": 418.22448818897635,
+            "line_rule": "auto",
+            "style": "Normal",
+            "direct_line": [],
+            "style_line": []
+          }
+        ],
+        "equations": 0,
+        "display_equations": 0,
+        "fractions": 0,
+        "radicals": 0,
+        "nary": 0,
+        "document_protection": 0,
+        "pass": true
+      },
+      "formulas": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/1eeb7e7-plain/formulas.docx",
+        "drawings": 0,
+        "inline_pictures": 0,
+        "floating_pictures": 0,
+        "pictures": [],
+        "equations": 6,
+        "display_equations": 4,
+        "fractions": 5,
+        "radicals": 1,
+        "nary": 2,
+        "document_protection": 0,
+        "pass": true
+      }
+    },
+    "external_commands": [
+      [
+        "mmdc",
+        "-i",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp6kafdttd/diagram.mmd",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp6kafdttd/diagram.png",
+        "-b",
+        "white",
+        "-c",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp6kafdttd/mermaid-config.json"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-a78hn57d/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-p1l6i0a8/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-grtpi7b4/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-_fuc8cgb/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-_5vc50fg/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-nz1_feq7/math.docx"
+      ]
+    ]
+  },
+  {
+    "version": "1eeb7e7",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/1eeb7e7",
+    "mode": "template",
+    "cases": {
+      "mermaid": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/1eeb7e7-template/mermaid.docx",
+        "drawings": 1,
+        "inline_pictures": 1,
+        "floating_pictures": 0,
+        "pictures": [
+          {
+            "height_pt": 418.22448818897635,
+            "line_rule": "exact",
+            "style": "Normal",
+            "direct_line": [],
+            "style_line": [
+              "560"
+            ]
+          }
+        ],
+        "equations": 0,
+        "display_equations": 0,
+        "fractions": 0,
+        "radicals": 0,
+        "nary": 0,
+        "document_protection": 0,
+        "pass": false
+      },
+      "formulas": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/1eeb7e7-template/formulas.docx",
+        "drawings": 0,
+        "inline_pictures": 0,
+        "floating_pictures": 0,
+        "pictures": [],
+        "equations": 6,
+        "display_equations": 4,
+        "fractions": 5,
+        "radicals": 1,
+        "nary": 2,
+        "document_protection": 0,
+        "pass": true
+      }
+    },
+    "external_commands": [
+      [
+        "mmdc",
+        "-i",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmprs_bz_wb/diagram.mmd",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmprs_bz_wb/diagram.png",
+        "-b",
+        "white",
+        "-c",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmprs_bz_wb/mermaid-config.json"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-ud02ft2f/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-s2r3kbkk/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-xq48jbas/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-8dlji1q0/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-0u4mue6f/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-8lzi7m48/math.docx"
       ]
     ]
   },
@@ -433,12 +764,12 @@
     "external_commands": []
   },
   {
-    "version": "1eeb7e7",
-    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/1eeb7e7",
+    "version": "cd04fc8",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/cd04fc8",
     "mode": "plain",
     "cases": {
       "mermaid": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/1eeb7e7-plain/mermaid.docx",
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/cd04fc8-plain/mermaid.docx",
         "drawings": 1,
         "inline_pictures": 1,
         "floating_pictures": 0,
@@ -460,95 +791,72 @@
         "pass": true
       },
       "formulas": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/1eeb7e7-plain/formulas.docx",
-        "drawings": 0,
-        "inline_pictures": 0,
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/cd04fc8-plain/formulas.docx",
+        "drawings": 5,
+        "inline_pictures": 5,
         "floating_pictures": 0,
-        "pictures": [],
-        "equations": 6,
-        "display_equations": 4,
-        "fractions": 5,
-        "radicals": 1,
-        "nary": 2,
+        "pictures": [
+          {
+            "height_pt": 10.8,
+            "line_rule": "auto",
+            "style": "Normal",
+            "direct_line": [
+              "360"
+            ],
+            "style_line": []
+          },
+          {
+            "height_pt": 90.92149606299212,
+            "line_rule": "auto",
+            "style": "Normal",
+            "direct_line": [],
+            "style_line": []
+          },
+          {
+            "height_pt": 142.8,
+            "line_rule": "auto",
+            "style": "Normal",
+            "direct_line": [],
+            "style_line": []
+          },
+          {
+            "height_pt": 132.23078740157482,
+            "line_rule": "auto",
+            "style": "Normal",
+            "direct_line": [],
+            "style_line": []
+          }
+        ],
+        "equations": 0,
+        "display_equations": 0,
+        "fractions": 0,
+        "radicals": 0,
+        "nary": 0,
         "document_protection": 0,
-        "pass": true
+        "pass": false
       }
     },
     "external_commands": [
       [
         "mmdc",
         "-i",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp6kafdttd/diagram.mmd",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp3itjfpot/diagram.mmd",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp6kafdttd/diagram.png",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp3itjfpot/diagram.png",
         "-b",
         "white",
         "-c",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp6kafdttd/mermaid-config.json"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-a78hn57d/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-p1l6i0a8/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-grtpi7b4/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-_fuc8cgb/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-_5vc50fg/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-nz1_feq7/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp3itjfpot/mermaid-config.json"
       ]
     ]
   },
   {
-    "version": "1eeb7e7",
-    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/1eeb7e7",
+    "version": "current-gui",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx",
     "mode": "template",
     "cases": {
       "mermaid": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/1eeb7e7-template/mermaid.docx",
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/current-gui-template/mermaid.docx",
         "drawings": 1,
         "inline_pictures": 1,
         "floating_pictures": 0,
@@ -569,10 +877,15 @@
         "radicals": 0,
         "nary": 0,
         "document_protection": 0,
+        "mermaid_report": {
+          "total": 1,
+          "succeeded": 1,
+          "failures": []
+        },
         "pass": false
       },
       "formulas": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/1eeb7e7-template/formulas.docx",
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/current-gui-template/formulas.docx",
         "drawings": 0,
         "inline_pictures": 0,
         "floating_pictures": 0,
@@ -583,20 +896,25 @@
         "radicals": 1,
         "nary": 2,
         "document_protection": 0,
+        "mermaid_report": {
+          "total": 0,
+          "succeeded": 0,
+          "failures": []
+        },
         "pass": true
       }
     },
     "external_commands": [
       [
-        "mmdc",
+        "/Users/zhangqijin/.nvm/versions/node/v26.4.0/bin/mmdc",
         "-i",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmprs_bz_wb/diagram.mmd",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpsor8vkdi/diagram.mmd",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmprs_bz_wb/diagram.png",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpsor8vkdi/diagram.png",
         "-b",
         "white",
         "-c",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmprs_bz_wb/mermaid-config.json"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpsor8vkdi/mermaid-config.json"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -605,7 +923,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-ud02ft2f/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-kc5l3t4v/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -614,7 +932,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-s2r3kbkk/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-0kwkoeid/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -623,7 +941,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-xq48jbas/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-thppcxvu/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -632,7 +950,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-8dlji1q0/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-3s49r9h2/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -641,7 +959,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-0u4mue6f/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-9c_as24z/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -650,17 +968,237 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-8lzi7m48/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-bazqnw_m/math.docx"
       ]
     ]
   },
   {
-    "version": "022ef8b",
-    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/022ef8b",
+    "version": "current",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx",
     "mode": "plain",
     "cases": {
       "mermaid": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-plain/mermaid.docx",
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/current-plain/mermaid.docx",
+        "drawings": 1,
+        "inline_pictures": 1,
+        "floating_pictures": 0,
+        "pictures": [
+          {
+            "height_pt": 418.22448818897635,
+            "line_rule": "auto",
+            "style": "Normal",
+            "direct_line": [],
+            "style_line": []
+          }
+        ],
+        "equations": 0,
+        "display_equations": 0,
+        "fractions": 0,
+        "radicals": 0,
+        "nary": 0,
+        "document_protection": 0,
+        "mermaid_report": {
+          "total": 1,
+          "succeeded": 1,
+          "failures": []
+        },
+        "pass": true
+      },
+      "formulas": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/current-plain/formulas.docx",
+        "drawings": 0,
+        "inline_pictures": 0,
+        "floating_pictures": 0,
+        "pictures": [],
+        "equations": 6,
+        "display_equations": 4,
+        "fractions": 5,
+        "radicals": 1,
+        "nary": 2,
+        "document_protection": 0,
+        "mermaid_report": {
+          "total": 0,
+          "succeeded": 0,
+          "failures": []
+        },
+        "pass": true
+      }
+    },
+    "external_commands": [
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-zt9wawpo/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-nrt_5j8y/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-2s342v3n/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-ywxfpct0/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-8qmu7yom/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-nhc50hsq/math.docx"
+      ]
+    ]
+  },
+  {
+    "version": "current",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx",
+    "mode": "template",
+    "cases": {
+      "mermaid": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/current-template/mermaid.docx",
+        "drawings": 1,
+        "inline_pictures": 1,
+        "floating_pictures": 0,
+        "pictures": [
+          {
+            "height_pt": 418.22448818897635,
+            "line_rule": "exact",
+            "style": "Normal",
+            "direct_line": [],
+            "style_line": [
+              "560"
+            ]
+          }
+        ],
+        "equations": 0,
+        "display_equations": 0,
+        "fractions": 0,
+        "radicals": 0,
+        "nary": 0,
+        "document_protection": 0,
+        "mermaid_report": {
+          "total": 1,
+          "succeeded": 1,
+          "failures": []
+        },
+        "pass": false
+      },
+      "formulas": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/current-template/formulas.docx",
+        "drawings": 0,
+        "inline_pictures": 0,
+        "floating_pictures": 0,
+        "pictures": [],
+        "equations": 6,
+        "display_equations": 4,
+        "fractions": 5,
+        "radicals": 1,
+        "nary": 2,
+        "document_protection": 0,
+        "mermaid_report": {
+          "total": 0,
+          "succeeded": 0,
+          "failures": []
+        },
+        "pass": true
+      }
+    },
+    "external_commands": [
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-nmtmscef/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-yy_5t04g/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-ikglvnoh/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-crlylvbr/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-ygd6la4j/math.docx"
+      ],
+      [
+        "/usr/local/bin/pandoc",
+        "-f",
+        "markdown+tex_math_dollars",
+        "-t",
+        "docx",
+        "-o",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-gp0kanl8/math.docx"
+      ]
+    ]
+  },
+  {
+    "version": "d14566d",
+    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/d14566d",
+    "mode": "plain",
+    "cases": {
+      "mermaid": {
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/d14566d-plain/mermaid.docx",
         "drawings": 1,
         "inline_pictures": 1,
         "floating_pictures": 0,
@@ -682,7 +1220,7 @@
         "pass": true
       },
       "formulas": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-plain/formulas.docx",
+        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/d14566d-plain/formulas.docx",
         "drawings": 0,
         "inline_pictures": 0,
         "floating_pictures": 0,
@@ -700,13 +1238,13 @@
       [
         "mmdc",
         "-i",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp85wlr1ya/diagram.mmd",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpi33ny6ht/diagram.mmd",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp85wlr1ya/diagram.png",
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpi33ny6ht/diagram.png",
         "-b",
         "white",
         "-c",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmp85wlr1ya/mermaid-config.json"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpi33ny6ht/mermaid-config.json"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -715,7 +1253,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-jkveshah/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-gjq8bd2p/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -724,7 +1262,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-49e_8owl/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-rva__bx3/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -733,7 +1271,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-9cr0sd94/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-p4k7lksv/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -742,7 +1280,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-8dyuia9_/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-nl0lvz1l/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -751,7 +1289,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-qkp0s5lg/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-81_px_li/math.docx"
       ],
       [
         "/usr/local/bin/pandoc",
@@ -760,283 +1298,7 @@
         "-t",
         "docx",
         "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-a2bu77tq/math.docx"
-      ]
-    ]
-  },
-  {
-    "version": "022ef8b",
-    "source": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/versions/022ef8b",
-    "mode": "template",
-    "cases": {
-      "mermaid": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-template/mermaid.docx",
-        "drawings": 1,
-        "inline_pictures": 1,
-        "floating_pictures": 0,
-        "pictures": [
-          {
-            "height_pt": 418.22448818897635,
-            "line_rule": "exact",
-            "style": "Normal",
-            "direct_line": [],
-            "style_line": [
-              "560"
-            ]
-          }
-        ],
-        "equations": 0,
-        "display_equations": 0,
-        "fractions": 0,
-        "radicals": 0,
-        "nary": 0,
-        "document_protection": 0,
-        "pass": false
-      },
-      "formulas": {
-        "file": "/Users/zhangqijin/PycharmProjects/md2docx/tests/conversion_assessment_20260916/022ef8b-template/formulas.docx",
-        "drawings": 0,
-        "inline_pictures": 0,
-        "floating_pictures": 0,
-        "pictures": [],
-        "equations": 6,
-        "display_equations": 4,
-        "fractions": 5,
-        "radicals": 1,
-        "nary": 2,
-        "document_protection": 0,
-        "pass": true
-      }
-    },
-    "external_commands": [
-      [
-        "mmdc",
-        "-i",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpo32ekob9/diagram.mmd",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpo32ekob9/diagram.png",
-        "-b",
-        "white",
-        "-c",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpo32ekob9/mermaid-config.json"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-khvn0pku/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-diip_bvp/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-4oiq4_72/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-cmooaj7p/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-bcc4otbx/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-hs2c13tf/math.docx"
-      ]
-    ]
-  },
-  {
-    "version": "current",
-    "source": "/Users/zhangqijin/PycharmProjects/md2docx",
-    "mode": "plain",
-    "cases": {
-      "mermaid": {
-        "error": "AttributeError: 'MermaidReport' object has no attribute 'rendered'",
-        "pass": false
-      },
-      "formulas": {
-        "error": "AttributeError: 'MermaidReport' object has no attribute 'rendered'",
-        "pass": false
-      }
-    },
-    "external_commands": [
-      [
-        "/Users/zhangqijin/.nvm/versions/node/v26.4.0/bin/mmdc",
-        "-i",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmphfkhl9s4/diagram.mmd",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmphfkhl9s4/diagram.png",
-        "-b",
-        "white",
-        "-c",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmphfkhl9s4/mermaid-config.json"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-qv6xdj6f/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-ke0wpdto/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-xi_jdib8/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-qwbsuwul/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-ynsecd0q/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-4a8nbr2k/math.docx"
-      ]
-    ]
-  },
-  {
-    "version": "current",
-    "source": "/Users/zhangqijin/PycharmProjects/md2docx",
-    "mode": "template",
-    "cases": {
-      "mermaid": {
-        "error": "AttributeError: 'MermaidReport' object has no attribute 'rendered'",
-        "pass": false
-      },
-      "formulas": {
-        "error": "AttributeError: 'MermaidReport' object has no attribute 'rendered'",
-        "pass": false
-      }
-    },
-    "external_commands": [
-      [
-        "/Users/zhangqijin/.nvm/versions/node/v26.4.0/bin/mmdc",
-        "-i",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpcz4ewk4a/diagram.mmd",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpcz4ewk4a/diagram.png",
-        "-b",
-        "white",
-        "-c",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/tmpcz4ewk4a/mermaid-config.json"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-i2u37y07/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-faupopkw/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-5r7c5cax/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-__y469ig/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-kzdojxv2/math.docx"
-      ],
-      [
-        "/usr/local/bin/pandoc",
-        "-f",
-        "markdown+tex_math_dollars",
-        "-t",
-        "docx",
-        "-o",
-        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-t6a_sl4j/math.docx"
+        "/var/folders/fq/qcc_dfm532q9jhfsjpbhl78c0000gn/T/md2docx-omml-rke66tn7/math.docx"
       ]
     ]
   }
