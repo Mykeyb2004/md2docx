@@ -18,6 +18,8 @@ from docx.oxml.ns import qn
 from md2docx.config_utils import clone_config, merge_config
 from md2docx.styles import StyleManager
 from md2docx.parser import MarkdownParser
+from md2docx.mermaid_converter import MermaidReport
+from md2docx.omml_converter import FormulaReport
 
 
 EXTENDED_PROPERTIES_NS = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
@@ -25,6 +27,20 @@ EXTENDED_PROPERTIES_NS = "http://schemas.openxmlformats.org/officeDocument/2006/
 
 class Converter:
     """Main converter class for Markdown to Word conversion."""
+
+    @property
+    def mermaid_report(self) -> MermaidReport:
+        """Return Mermaid outcomes for the most recent document conversion."""
+        if self.parser.renderer is None:
+            return MermaidReport()
+        return self.parser.renderer.mermaid_report
+
+    @property
+    def formula_report(self) -> FormulaReport:
+        """Return native, fallback, and failed formula outcomes for the last document."""
+        if self.parser.renderer is None:
+            return FormulaReport()
+        return self.parser.renderer.formula_report
     
     def __init__(
         self,

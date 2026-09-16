@@ -42,6 +42,20 @@ uv run --group build python scripts/build_nuitka.py --entry gui --mode app --cle
 
 当前 app 管线仅支持 macOS arm64 本机构建，使用 ad-hoc 签名，不需要 Apple Developer 账号。Developer ID、notarization、DMG、universal binary 和 CI 构建不在当前版本范围内。
 
+### Mermaid 与公式转换的桌面运行环境
+
+从 Finder 启动应用时，系统通常只提供 `/usr/bin:/bin:/usr/sbin:/sbin`，不会加载终端中的 NVM 配置。应用会先使用已有 PATH，再查找 `~/.local/bin`、`/opt/homebrew/bin` 和 `/usr/local/bin`。Mermaid 还会查找 `NVM_BIN`、`NVM_DIR`（默认 `~/.nvm`）下已安装的 Node.js 版本，以及 `~/.volta/bin`，并优先让 mmdc 使用其同目录的 node。仅为子进程补充 PATH，不修改系统环境或执行 shell 配置文件。
+
+应用仍使用本机安装的 `@mermaid-js/mermaid-cli`、其浏览器运行时和 Pandoc。常见安装方式无需再把机器上的绝对路径写进 YAML；自定义 `mermaid.command` 路径会被尊重，指定路径不存在时不会悄悄改用另一份 mmdc。
+
+Mermaid 渲染失败时保留源码并报告图序号及 CLI 错误。公式无法生成 OMML 时继续尝试 PNG，同时提示该公式失去原生可编辑性；PNG 也失败时保留 LaTeX 源码并报告原因。GUI 将此类结果记录为 `Warning`。CLI 保存输出并打印警告，以退出码 `2` 表示不完整转换；目录转换会继续完成其他文件，再返回该状态。Python API 可通过 `Converter.mermaid_report` 和 `Converter.formula_report` 读取最近一次转换的统计。
+
+桌面运行环境回归测试：
+
+```bash
+uv run pytest tests/test_mermaid_runtime.py tests/test_formula_runtime.py
+```
+
 ## 兼容的原有构建方式
 
 GUI onefile：

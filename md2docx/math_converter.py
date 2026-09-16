@@ -86,13 +86,15 @@ class MathConverter:
         
         # Save to bytes
         buf = io.BytesIO()
-        fig.savefig(buf,
-                   format='png',
-                   dpi=self.dpi,
-                   bbox_inches='tight',
-                   pad_inches=pad,
-                   transparent=True)
-        plt.close(fig)
+        try:
+            fig.savefig(buf,
+                       format='png',
+                       dpi=self.dpi,
+                       bbox_inches='tight',
+                       pad_inches=pad,
+                       transparent=True)
+        finally:
+            plt.close(fig)
         
         buf.seek(0)
         return buf.read()

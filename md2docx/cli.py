@@ -32,6 +32,38 @@ def _ensure_output_available(
         parser.error(f"output already exists: {output_path}. Use --overwrite to replace it.")
 
 
+def _report_mermaid_failures(converter: Converter, output_path: Path) -> bool:
+    """Report incomplete diagrams without discarding the saved document."""
+    report = converter.mermaid_report
+    if not report.failures:
+        return False
+    print(
+        f"Warning: {output_path}: Mermaid images {report.succeeded}/{report.total}; "
+        f"{len(report.failures)} failed and were preserved as source.",
+        file=sys.stderr,
+    )
+    for failure in report.failures:
+        print(f"  Diagram {failure.index}: {failure.error}", file=sys.stderr)
+    return True
+
+
+def _report_conversion_warnings(converter: Converter, output_path: Path) -> bool:
+    """Report diagram failures and formula degradation after saving a document."""
+    has_warning = _report_mermaid_failures(converter, output_path)
+    report = converter.formula_report
+    if report.fallbacks or report.failures:
+        has_warning = True
+        print(
+            f"Warning: {output_path}: Native formulas {report.native}/{report.total}; "
+            f"{len(report.fallbacks)} image fallback(s), {len(report.failures)} failure(s).",
+            file=sys.stderr,
+        )
+        for kind, issues in [('image fallback', report.fallbacks), ('source preserved', report.failures)]:
+            for issue in issues:
+                print(f"  Formula {issue.index} ({kind}): {issue.latex[:120]}\n{issue.error}", file=sys.stderr)
+    return has_warning
+
+
 def main() -> None:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -161,9 +193,16 @@ def main() -> None:
             for _, output_path in output_jobs:
                 _ensure_output_available(output_path, args.overwrite, parser)
 
+            incomplete_files = 0
             for md_file, output_path in output_jobs:
                 print(f"Converting {md_file} to {output_path}...")
                 converter.convert(str(md_file), str(output_path))
+                if _report_conversion_warnings(converter, output_path):
+                    incomplete_files += 1
+
+            if incomplete_files:
+                print(f"Conversion completed with warnings in {incomplete_files} file(s).", file=sys.stderr)
+                sys.exit(2)
 
             print(f"✓ Conversion successful! Converted {len(markdown_files)} file(s). Output dir: {output_dir}")
         else:
@@ -171,6 +210,8 @@ def main() -> None:
             _ensure_output_available(output_path, args.overwrite, parser)
             print(f"Converting {args.input} to {output_path}...")
             converter.convert(args.input, str(output_path))
+            if _report_conversion_warnings(converter, output_path):
+                sys.exit(2)
             print(f"✓ Conversion successful! Output: {output_path}")
         
     except FileNotFoundError as e:

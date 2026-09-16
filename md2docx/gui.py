@@ -2123,8 +2123,32 @@ class Md2docxGUI:
             converter = Converter(**converter_kwargs)
 
             converter.convert(input_file, output_file)
-
-            self.add_to_history(input_file, output_file, "Success")
+            report = converter.mermaid_report
+            formula_report = converter.formula_report
+            warning_summaries = []
+            warning_details = []
+            if report.failures:
+                warning_summaries.append(
+                    f"Mermaid 图片成功 {report.succeeded}/{report.total}，失败 {len(report.failures)} 张"
+                )
+                warning_details.extend(
+                    f"第 {failure.index} 张图：{failure.error}" for failure in report.failures
+                )
+            if formula_report.fallbacks or formula_report.failures:
+                warning_summaries.append(
+                    f"公式原生可编辑 {formula_report.native}/{formula_report.total}，"
+                    f"图片回退 {len(formula_report.fallbacks)} 个，失败 {len(formula_report.failures)} 个"
+                )
+                for kind, issues in [('已转为图片', formula_report.fallbacks), ('保留源码', formula_report.failures)]:
+                    warning_details.extend(
+                        f"第 {issue.index} 个公式（{kind}）：{issue.latex[:120]}\n{issue.error}"
+                        for issue in issues
+                    )
+            summary = '；'.join(warning_summaries)
+            if warning_summaries:
+                self.add_to_history(input_file, output_file, f"Warning: {summary}")
+            else:
+                self.add_to_history(input_file, output_file, "Success")
 
             def finish_progress() -> None:
                 self.progress.stop()
@@ -2132,15 +2156,31 @@ class Md2docxGUI:
                 self.root.update_idletasks()
 
             self.root.after(0, finish_progress)
-            self.root.after(0, lambda: self.status_var.set(f"✓ 转换成功：{output_file}"))
-            self.root.after(
-                0,
-                lambda: messagebox.showinfo(
-                    "转换成功",
-                    f"文件已成功转换！\n\n输出：{output_file}",
-                    parent=self.dialog_parent(),
-                ),
-            )
+            if warning_summaries:
+                details = '\n\n'.join(warning_details[:8])
+                if len(warning_details) > 8:
+                    details += f"\n\n另有 {len(warning_details) - 8} 项需要检查。"
+                warning_message = (
+                    f"文档已保存，但部分内容需要检查。\n{summary}\n"
+                    f"失败内容已保留为源码；图片公式无法像原生公式一样编辑。\n\n{details}\n\n输出：{output_file}"
+                )
+                self.root.after(0, lambda: self.status_var.set(f"⚠ 转换完成但有警告：{summary}"))
+                self.root.after(
+                    0,
+                    lambda: messagebox.showwarning(
+                        "转换完成，但有内容需要检查", warning_message, parent=self.dialog_parent(),
+                    ),
+                )
+            else:
+                self.root.after(0, lambda: self.status_var.set(f"✓ 转换成功：{output_file}"))
+                self.root.after(
+                    0,
+                    lambda: messagebox.showinfo(
+                        "转换成功",
+                        f"文件已成功转换！\n\n输出：{output_file}",
+                        parent=self.dialog_parent(),
+                    ),
+                )
             self.root.after(0, self.refresh_history_list)
 
         except Exception as exc:

@@ -57,12 +57,14 @@ class DocxRenderer(mistune.BaseRenderer):
         
         # Initialize math converter for LaTeX formulas
         from md2docx.math_converter import MathConverter
-        from md2docx.omml_converter import OmmlConverter
+        from md2docx.omml_converter import OmmlConverter, FormulaReport
         self.math_converter = MathConverter(dpi=300)
         self.omml_converter = OmmlConverter()
+        self.formula_report = FormulaReport()
 
         # Initialize Mermaid converter for fenced mermaid blocks
-        from md2docx.mermaid_converter import MermaidConverter
+        from md2docx.mermaid_converter import MermaidConverter, MermaidReport
+        self.mermaid_report = MermaidReport()
         mermaid_style = self.styles.get_mermaid_style()
         self.mermaid_converter = MermaidConverter(
             command=mermaid_style.get('command', 'mmdc'),
@@ -1188,16 +1190,17 @@ class DocxRenderer(mistune.BaseRenderer):
 
     def _append_omml(self, paragraph: Any, latex: str, inline: bool) -> bool:
         """Append Word-native OMML math to a paragraph when conversion succeeds."""
+        self.formula_report.total += 1
         try:
             elements = self.omml_converter.latex_to_omml(latex, inline=inline)
-        except Exception:
+            if not elements:
+                raise ValueError('Pandoc produced no Word-native equation')
+            for element in elements:
+                paragraph._p.append(element)
+        except Exception as exc:
+            self._last_formula_error = exc
             return False
-
-        if not elements:
-            return False
-
-        for element in elements:
-            paragraph._p.append(element)
+        self.formula_report.native += 1
         return True
 
     def _apply_math_block_format(self, paragraph: Any) -> None:
@@ -1246,10 +1249,24 @@ class DocxRenderer(mistune.BaseRenderer):
                 run.add_picture(BytesIO(img_bytes), width=width)
             else:
                 run.add_picture(BytesIO(img_bytes), width=Inches(4))
+            self.formula_report.record_fallback(latex, self._last_formula_error)
             return True
-        except Exception:
+        except Exception as exc:
+            self.formula_report.record_failure(latex, exc, self._last_formula_error)
             paragraph._element.getparent().remove(paragraph._element)
             return False
+
+    def _add_inline_math_formula(self, paragraph: Any, latex: str) -> None:
+        """Preserve inline formulas and report any loss of native editability."""
+        if self._append_omml(paragraph, latex, inline=True):
+            return
+        try:
+            img_bytes = self.math_converter.latex_to_image(latex, inline=True)
+            paragraph.add_run().add_picture(BytesIO(img_bytes), height=Inches(0.15))
+            self.formula_report.record_fallback(latex, self._last_formula_error)
+        except Exception as exc:
+            self.formula_report.record_failure(latex, exc, self._last_formula_error)
+            paragraph.add_run(f'${latex}$')
     
     def _add_formatted_text(self, paragraph: Any, text: str, base_style: Dict[str, Any]) -> None:
         """
@@ -1304,25 +1321,12 @@ class DocxRenderer(mistune.BaseRenderer):
                     formulas = getattr(self, 'math_formulas', {'inline': []})
                     if idx < len(formulas.get('inline', [])):
                         latex = formulas['inline'][idx]
-                        if not self._append_omml(paragraph, latex, inline=True):
-                            try:
-                                img_bytes = self.math_converter.latex_to_image(latex, inline=True)
-                                run = paragraph.add_run()
-                                run.add_picture(BytesIO(img_bytes), height=Inches(0.15))
-                            except:
-                                # Fallback: show LaTeX code
-                                paragraph.add_run(f'${latex}$')
+                        self._add_inline_math_formula(paragraph, latex)
                 except:
                     pass
             elif part.startswith('〔INLINE_MATH_DIRECT:') and part.endswith('〕'):
                 latex = part.replace('〔INLINE_MATH_DIRECT:', '').replace('〕', '')
-                if not self._append_omml(paragraph, latex, inline=True):
-                    try:
-                        img_bytes = self.math_converter.latex_to_image(latex, inline=True)
-                        run = paragraph.add_run()
-                        run.add_picture(BytesIO(img_bytes), height=Inches(0.15))
-                    except:
-                        paragraph.add_run(f'${latex}$')
+                self._add_inline_math_formula(paragraph, latex)
             elif part.startswith('〔BLOCK_MATH_') and part.endswith('〕'):
                 # Block math should not appear in inline text
                 # This shouldn't happen with proper preprocessing
@@ -1469,6 +1473,7 @@ class DocxRenderer(mistune.BaseRenderer):
             return ''
 
         if language == 'mermaid':
+            self.mermaid_report.total += 1
             mermaid_style = self.styles.get_mermaid_style()
             try:
                 img_bytes = self.mermaid_converter.mermaid_to_image(code_text)
@@ -1507,9 +1512,9 @@ class DocxRenderer(mistune.BaseRenderer):
                     widow_control=mermaid_style.get('widow_control', False),
                 )
                 return ''
-            except Exception:
-                # Fall back to the existing code block rendering if Mermaid render fails.
-                pass
+            except Exception as exc:
+                # Preserve source, but let callers distinguish incomplete output.
+                self.mermaid_report.record_failure(exc)
         
         # Get code block style
         code_style = self.styles.get_code_block_style()

@@ -3,11 +3,41 @@ Mermaid diagram converter using Mermaid CLI.
 """
 import hashlib
 import json
-import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+from md2docx.external_tools import resolve_external_command
+
+
+@dataclass(frozen=True)
+class MermaidFailure:
+    """A diagram that was preserved as source instead of an image."""
+
+    index: int
+    error: str
+
+
+@dataclass
+class MermaidReport:
+    """Diagram outcomes for one document, in source order."""
+
+    total: int = 0
+    failures: List[MermaidFailure] = field(default_factory=list)
+
+    @property
+    def succeeded(self) -> int:
+        return self.total - len(self.failures)
+
+    def record_failure(self, exc: Exception) -> None:
+        """Keep the underlying CLI error without its lengthy JavaScript stack."""
+        while exc.__cause__ is not None:
+            exc = exc.__cause__
+        detail = str(exc).strip() or type(exc).__name__
+        detail = '\n'.join(detail.splitlines()[:4])[:600]
+        self.failures.append(MermaidFailure(self.total, detail))
 
 
 class MermaidConverter:
@@ -49,7 +79,12 @@ class MermaidConverter:
 
     def is_available(self) -> bool:
         """Return whether Mermaid CLI is available in the current environment."""
-        return shutil.which(self.command) is not None
+        command, _ = self._command_environment()
+        return command is not None
+
+    def _command_environment(self) -> Tuple[Optional[str], Dict[str, str]]:
+        """Resolve local installs without relying on Finder loading shell profiles."""
+        return resolve_external_command(self.command, node_runtime=True)
 
     def mermaid_to_image(self, code: str) -> bytes:
         """
@@ -89,6 +124,9 @@ class MermaidConverter:
 
     def _render_diagram(self, code: str) -> bytes:
         """Render Mermaid code to an image via Mermaid CLI."""
+        executable, env = self._command_environment()
+        if executable is None:
+            raise RuntimeError(f"Mermaid CLI command '{self.command}' not found")
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
             input_path = tmp_path / "diagram.mmd"
@@ -97,7 +135,7 @@ class MermaidConverter:
             input_path.write_text(code, encoding="utf-8")
 
             command = [
-                self.command,
+                executable,
                 "-i",
                 str(input_path),
                 "-o",
@@ -125,6 +163,7 @@ class MermaidConverter:
                 check=False,
                 capture_output=True,
                 text=True,
+                env=env,
             )
 
             if result.returncode != 0 or not output_path.exists():
