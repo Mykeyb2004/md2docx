@@ -56,6 +56,7 @@ heading4:
   font_name: "仿宋"
   font_size: 14pt
   font_color: "#000000"
+  bold: true
   italic: false  # 斜体
   space_before: 3pt
   space_after: 3pt
