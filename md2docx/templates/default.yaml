@@ -10,6 +10,7 @@ document:
   line_spacing: 1.5
   ignore_thematic_breaks: true  # true = 忽略 Markdown 分割线，不写入 docx
   auto_fix_tables: false  # true = 自动修复缺少 separator 的不规范 Markdown 表格
+  section_index: false  # true = 在每个二级标题前插入三级、四级标题索引页（无页码）
 
 # Word document metadata.
 # Fill these for upload-sensitive documents to avoid blank or tool-default properties.

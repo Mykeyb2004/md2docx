@@ -26,6 +26,114 @@ class _FakeBooleanVar:
         self.value = value
 
 
+@pytest.mark.parametrize('enabled', [True, False])
+def test_main_index_switch_persists_overrides_config_and_controls_output(tmp_path, enabled):
+    from md2docx import Converter
+
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = tmp_path / 'preferences.json'
+    gui.preferences_file.write_text(json.dumps({'last_word_template_path': 'keep.docx'}))
+    gui.config_document = ConfigDocument.from_defaults({'document': {'section_index': not enabled}})
+    gui.section_index_var = _FakeBooleanVar(enabled)
+    gui.on_section_index_toggled()
+    effective = gui.build_effective_conversion_config()
+    assert effective['document']['section_index'] is enabled
+    assert gui.config_document.saved_config['document']['section_index'] is not enabled
+    assert not gui.config_document.dirty
+    doc = Converter(config_data=effective).to_document('## Main\n\n### Child')
+    assert len(doc.tables) == int(enabled)
+    effective['document']['section_index'] = not enabled
+    assert gui.build_effective_conversion_config()['document']['section_index'] is enabled
+
+    reopened = Md2docxGUI.__new__(Md2docxGUI)
+    reopened.preferences_file = gui.preferences_file
+    reopened.config_document = gui.config_document
+    assert reopened.load_section_index_enabled() is enabled
+    assert json.loads(gui.preferences_file.read_text()) == {
+        'last_word_template_path': 'keep.docx', 'section_index_enabled': enabled,
+    }
+
+
+def test_index_switch_save_failure_warns_but_applies_current_choice(tmp_path, monkeypatch):
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = tmp_path / 'preferences.json'
+    gui.section_index_var = _FakeBooleanVar(True)
+    gui.config_document = ConfigDocument.from_defaults({})
+    warnings = []
+    monkeypatch.setattr(gui, 'save_preferences', lambda _preferences: False)
+    monkeypatch.setattr(gui_module.messagebox, 'showwarning', lambda *args, **kwargs: warnings.append(args))
+    gui.on_section_index_toggled()
+    assert gui.build_effective_conversion_config()['document']['section_index'] is True
+    assert warnings and warnings[0][0] == '偏好保存失败'
+
+
+def test_main_index_switch_and_heading_fonts_survive_editor_save_and_restart(tmp_path, monkeypatch):
+    """Opening the editor carries the main switch; saving remembers all styles."""
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.root = None
+    gui.preferences_file = tmp_path / 'preferences.json'
+    gui.packaged_default_config = load_yaml_config(Path('md2docx/templates/default.yaml'))
+    gui.config_document = ConfigDocument.from_defaults(gui.packaged_default_config)
+    gui.config_file_var = _FakeStringVar()
+    gui.status_var = _FakeStringVar()
+    gui.config_editor = None
+    gui.section_index_var = _FakeBooleanVar(True)
+    gui.on_section_index_toggled()
+    captured = {}
+
+    def editor_factory(parent, **kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(gui_module, 'ConfigEditorWindow', editor_factory)
+    gui.open_config_editor()
+    document = captured['document']
+    assert document.draft_config['document']['section_index'] is True
+    for level in range(1, 5):
+        document.draft_config[f'heading{level}'].update(
+            font_name=f'User font {level}', font_size=f'{level + 10}.5pt',
+            alignment='center', first_line_indent=0, space_before='12pt',
+        )
+    document.update_draft(document.draft_config)
+    config_path = tmp_path / 'custom.yaml'
+    document.save_as(config_path)
+    captured['on_saved'](config_path)
+
+    reopened = Md2docxGUI.__new__(Md2docxGUI)
+    reopened.preferences_file = gui.preferences_file
+    reopened.packaged_default_config = gui.packaged_default_config
+    reopened.config_document, error = reopened.load_initial_config_document()
+    reopened.section_index_enabled = reopened.load_section_index_enabled()
+    assert error is None
+    assert reopened.config_document.current_path == config_path
+    assert reopened.build_effective_conversion_config() == document.saved_config
+    assert reopened.section_index_enabled is True
+    from md2docx import Converter
+    result = Converter(config_data=reopened.build_effective_conversion_config()).to_document(
+        '# Chapter\n\n## Main\n\n### Child\n\n#### Detail'
+    )
+    assert len(result.tables) == 1
+    assert result.paragraphs[1].runs[0].font.name == 'User font 2'
+
+
+def test_opening_config_updates_main_index_switch_and_remembered_state(tmp_path, monkeypatch):
+    gui = Md2docxGUI.__new__(Md2docxGUI)
+    gui.preferences_file = tmp_path / 'preferences.json'
+    gui.packaged_default_config = {'document': {'section_index': False}}
+    gui.config_document = ConfigDocument.from_defaults(gui.packaged_default_config)
+    gui.config_file_var = _FakeStringVar()
+    gui.status_var = _FakeStringVar()
+    gui.section_index_var = _FakeBooleanVar(True)
+    gui.on_section_index_toggled()
+    path = tmp_path / 'selected.yaml'
+    path.write_text('document:\n  section_index: false\n')
+    monkeypatch.setattr(gui_module.filedialog, 'askopenfilename', lambda **kwargs: str(path))
+    gui.browse_config_file()
+    assert gui.section_index_var.get() is False
+    assert gui.build_effective_conversion_config()['document']['section_index'] is False
+    assert gui.load_section_index_enabled() is False
+
+
 class _FakeStringVar:
     """Minimal StringVar stand-in for non-Tk unit tests."""
 
@@ -737,8 +845,13 @@ def test_main_window_buttons_use_chinese_labels(monkeypatch):
         "Markdown 文件：",
         "输出文件：",
         "当前配置：",
+        "样式沿用二～四级标题配置",
     ]
-    assert [widget.kwargs["text"] for widget in checkbuttons] == ["使用 Word 模板"]
+    assert [widget.kwargs["text"] for widget in checkbuttons] == [
+        "使用 Word 模板", "插入二级标题索引页",
+    ]
+    assert checkbuttons[1].kwargs['variable'] is gui.section_index_var
+    assert checkbuttons[1].kwargs['command'] == gui.on_section_index_toggled
 
 
 def test_gui_startup_warns_once_for_remembered_invalid_template(tmp_path, monkeypatch):

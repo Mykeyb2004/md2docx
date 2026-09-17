@@ -54,6 +54,12 @@ class DocxRenderer(mistune.BaseRenderer):
         self._current_paragraph = None
         self.math_formulas = {'inline': [], 'block': []}  # Will be set by parser
         self.outline_processing = {'mode': 'auto', 'active': False}
+        # Retain semantic levels; Word styles alone lose Chinese outline levels
+        # and collapse Markdown H5/H6 into the Heading 4 visual style.
+        self.headings: List[Tuple[int, Any]] = []
+        # Chinese outlines nested inside Markdown chapters are body subheadings,
+        # not a second document-level chapter hierarchy.
+        self.markdown_headings: List[Tuple[int, Any]] = []
         
         # Initialize math converter for LaTeX formulas
         from md2docx.math_converter import MathConverter
@@ -79,7 +85,7 @@ class DocxRenderer(mistune.BaseRenderer):
         self._ordered_abstract_num_id: Optional[int] = None
         self._numbering_was_missing = not self._document_has_numbering_part()
     
-    def _parse_font_size(self, size_str: str) -> int:
+    def _parse_font_size(self, size_str: str) -> float:
         """
         Parse font size string to points.
         
@@ -89,15 +95,12 @@ class DocxRenderer(mistune.BaseRenderer):
         Returns:
             Font size in points
         """
-        if isinstance(size_str, int):
-            return size_str
-        
         size_str = str(size_str).lower().strip()
         
         if size_str.endswith('pt'):
-            return int(size_str[:-2])
+            return float(size_str[:-2])
         
-        return int(size_str)
+        return float(size_str)
     
     def _parse_color(self, color_str: str) -> RGBColor:
         """
@@ -712,7 +715,7 @@ class DocxRenderer(mistune.BaseRenderer):
         if 'line_spacing' in style:
             paragraph.paragraph_format.line_spacing = style['line_spacing']
 
-        if 'first_line_indent' in style and style['first_line_indent'] > 0:
+        if 'first_line_indent' in style:
             char_count = style['first_line_indent']
             font_size_pt = self._parse_font_size(style.get('font_size', '12pt'))
             paragraph.paragraph_format.first_line_indent = Pt(char_count * font_size_pt)
@@ -737,6 +740,7 @@ class DocxRenderer(mistune.BaseRenderer):
                     run.font.italic = style['italic']
 
         self._apply_text_paragraph_format(paragraph, style)
+        self.headings.append((level, paragraph))
 
     def _get_image_pixel_size(self, img_bytes: bytes) -> Tuple[int, int]:
         """Read image pixel dimensions from image bytes."""
@@ -1107,6 +1111,8 @@ class DocxRenderer(mistune.BaseRenderer):
         
         # Add heading to document WITHOUT text first
         heading = self.doc.add_heading('', level=level)
+        self.headings.append((token['attrs']['level'], heading))
+        self.markdown_headings.append((token['attrs']['level'], heading))
         
         # Parse and add formatted text to heading
         self._add_formatted_text(heading, text, style)
@@ -1120,21 +1126,7 @@ class DocxRenderer(mistune.BaseRenderer):
                 if 'italic' in style:
                     run.font.italic = style['italic']
         
-        # Apply paragraph-level styles
-        if 'alignment' in style:
-            heading.alignment = self._get_alignment(style['alignment'])
-        
-        if 'space_before' in style:
-            heading.paragraph_format.space_before = Pt(self._parse_font_size(style['space_before']))
-        
-        if 'space_after' in style:
-            heading.paragraph_format.space_after = Pt(self._parse_font_size(style['space_after']))
-        
-        # Apply first line indent if specified
-        if 'first_line_indent' in style and style['first_line_indent'] > 0:
-            char_count = style['first_line_indent']
-            font_size_pt = self._parse_font_size(style.get('font_size', '12pt'))
-            heading.paragraph_format.first_line_indent = Pt(char_count * font_size_pt)
+        self._apply_text_paragraph_format(heading, style)
         
         return ''
 
