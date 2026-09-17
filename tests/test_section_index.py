@@ -29,6 +29,10 @@ def _body_texts(doc):
     return [''.join(p.xpath('.//w:t/text()')) for p in doc._element.body.xpath('.//w:p')]
 
 
+def _entries(table):
+    return [p for row in table.rows[1:] for p in row.cells[0].paragraphs]
+
+
 def test_section_index_is_off_by_default_and_old_configs_keep_the_same_body():
     markdown = '## Section\n\n### Child\n\n#### Detail\n\nText'
     old = Converter(config_data={'document': {'page_size': 'A4'}}).to_document(markdown)
@@ -76,8 +80,10 @@ def test_indexes_follow_source_order_and_stop_at_h1_or_h2():
 
 def test_empty_section_keeps_a_title_only_index_without_leading_blank_page():
     doc = _converter().to_document('## Empty\n\nBody')
-    title, heading, body = doc.paragraphs
-    assert [_text(p) for p in doc.paragraphs] == ['Empty', 'Empty', 'Body']
+    heading, body = doc.paragraphs
+    assert len(doc.tables[0].rows) == 1
+    title = doc.tables[0].cell(0, 0).paragraphs[0]
+    assert _body_texts(doc) == ['Empty', 'Empty', 'Body']
     assert title.paragraph_format.page_break_before is False
     assert title.paragraph_format.keep_with_next is False
     assert heading.paragraph_format.page_break_before is True
@@ -98,14 +104,14 @@ def test_indexes_have_indentation_clickable_unique_targets_and_no_page_numbers(t
     starts = doc._element.xpath('.//w:bookmarkStart')
     assert {node.get(qn('w:name')) for node in starts} == set(anchors)
     assert all(node.getparent().xpath('./w:pPr/w:pStyle') for node in starts)
-    entries = [p for table in doc.tables for p in table.cell(0, 0).paragraphs]
+    entries = [p for table in doc.tables for p in _entries(table)]
     assert [p.paragraph_format.left_indent for p in entries] == [Pt(0), Pt(0), Pt(0)]
     assert [p.paragraph_format.first_line_indent for p in entries] == [Pt(16), Pt(24), Pt(16)]
     assert all(p.alignment == WD_ALIGN_PARAGRAPH.RIGHT for p in entries)
     assert all(p.style.name == 'Normal' for p in entries)
     assert all(p._p.xpath('./w:pPr/w:outlineLvl/@w:val') == ['9'] for p in entries)
     assert not doc._element.xpath('.//w:instrText | .//w:fldSimple')
-    assert doc.paragraphs[1].paragraph_format.page_break_before is True
+    assert all(table.cell(0, 0).paragraphs[0].paragraph_format.page_break_before is True for table in doc.tables)
 
 
 def test_indexes_preserve_heading_formatting_and_ignore_fenced_headings():
@@ -167,7 +173,7 @@ def test_long_index_keeps_all_entries_and_allows_page_flow():
     markdown = '## Main\n\n' + '\n\n'.join(f'### Item {i}' for i in range(100))
     doc = _converter().to_document(markdown)
     assert len(_links(doc)) == 100
-    entries = doc.tables[0].cell(0, 0).paragraphs
+    entries = _entries(doc.tables[0])
     assert [_text(p) for p in entries] == [f'Item {i}' for i in range(100)]
     assert all(p.paragraph_format.keep_with_next is False for p in entries)
     assert all(p.paragraph_format.page_break_before is False for p in entries)
@@ -179,17 +185,68 @@ def test_index_layout_matches_reference_frame_centering_and_group_spacing():
         'heading3': {'font_size': '16pt', 'alignment': 'center', 'space_before': '20pt'},
         'heading4': {'font_size': '16pt', 'alignment': 'center', 'space_before': '0pt'},
     }).to_document('## Main\n\n### 1.1 Group\n\n#### 1.1.1 Child\n\n### 1.2 Group\n\n#### 1.2.1 Child')
-    title = doc.paragraphs[0]
+    title = doc.tables[0].cell(0, 0).paragraphs[0]
     assert title.alignment == WD_ALIGN_PARAGRAPH.CENTER
     assert all(run.font.size == Pt(22) and run.bold for run in title.runs)
     frame = doc.tables[0]
     assert frame._tbl.xpath('./w:tblPr/w:tblBorders/*[not(starts-with(local-name(), "inside"))]/@w:val') == ['double'] * 4
-    assert frame._tbl.xpath('./w:tr/w:trPr/w:trHeight/@w:hRule') == ['atLeast']
-    assert frame._tbl.xpath('./w:tr/w:tc/w:tcPr/w:vAlign/@w:val') == ['center']
-    paragraphs = frame.cell(0, 0).paragraphs
+    assert not frame._tbl.xpath('./w:tr/w:trPr/w:trHeight')
+    assert frame._tbl.xpath('./w:tr/w:tc/w:tcPr/w:vAlign/@w:val') == ['center'] * 5
+    paragraphs = _entries(frame)
     assert [p.paragraph_format.space_before for p in paragraphs] == [Pt(20), Pt(0), Pt(20), Pt(0)]
     assert [p.paragraph_format.keep_with_next for p in paragraphs] == [True, False, True, False]
     assert all(p.alignment == WD_ALIGN_PARAGRAPH.CENTER for p in paragraphs)
+
+
+@pytest.mark.parametrize('entry_count', [1, 6, 19, 100])
+def test_index_frame_fits_content_and_starts_with_its_title(tmp_path, entry_count):
+    """No page-sized row or fixed width may push the frame past its title."""
+    template = Document()
+    template.sections[0].page_width = Cm(18)
+    template.sections[0].page_height = Cm(20)
+    template.sections[0].header.paragraphs[0].text = 'Template header'
+    template.sections[0].footer.paragraphs[0].text = 'Template footer'
+    template_path = tmp_path / 'template.docx'
+    template.save(template_path)
+    title_text = 'Long section title with enough text to wrap across several lines'
+    markdown = f'## {title_text}\n\n' + '\n\n'.join(
+        f'### Entry {i}\n\nBody text.' for i in range(entry_count)
+    )
+    result_path = tmp_path / 'result.docx'
+    _converter(
+        word_template=str(template_path),
+        config_data={'heading2': {
+            'font_size': '28pt', 'space_before': '12pt', 'space_after': '24pt',
+        }},
+    ).convert_string(markdown, str(result_path))
+    doc = Document(result_path)
+    frame = doc.tables[0]
+    title = frame.cell(0, 0).paragraphs[0]
+    body_title = doc.paragraphs[0]
+    assert title.text == body_title.text == title_text
+    assert len(frame.rows) == entry_count + 1
+    assert all(len(row.cells[0].paragraphs) == 1 for row in frame.rows)
+    assert frame._tbl.getnext() is body_title._p
+    assert not doc._element.body.xpath('./w:p/w:pPr/w:outlineLvl[@w:val="9"]')
+    assert title.paragraph_format.keep_with_next is True
+    assert title.paragraph_format.page_break_before is False
+    assert title.paragraph_format.space_after == Pt(24)
+    assert body_title.paragraph_format.page_break_before is True
+    assert frame.autofit is True
+    assert frame._tbl.xpath('./w:tblPr/w:tblW/@w:type') == ['auto']
+    assert frame._tbl.xpath('./w:tr/w:tc/w:tcPr/w:tcW/@w:type') == ['auto'] * (entry_count + 1)
+    assert not frame._tbl.xpath('./w:tr/w:trPr/w:trHeight')
+    assert len(frame._tbl.xpath('./w:tr/w:trPr/w:cantSplit')) == entry_count + 1
+    # Padding belongs to the outside of the frame, not every entry row.
+    assert frame._tbl.xpath('./w:tr/w:tc/w:tcPr/w:tcMar/w:top/@w:w') == ['200'] + ['0'] * entry_count
+    assert frame._tbl.xpath('./w:tr/w:tc/w:tcPr/w:tcMar/w:bottom/@w:w') == ['0'] * entry_count + ['200']
+    assert frame._tbl.xpath('./w:tblPr/w:tblBorders/w:insideH/@w:val') == ['nil']
+    entries = _entries(frame)
+    assert [_text(p) for p in entries] == [f'Entry {i}' for i in range(entry_count)]
+    assert all(p.paragraph_format.page_break_before is False for p in entries)
+    assert doc.sections[0]._sectPr.xml == template.sections[0]._sectPr.xml
+    assert doc.sections[0].header._element.xml == template.sections[0].header._element.xml
+    assert doc.sections[0].footer._element.xml == template.sections[0].footer._element.xml
 
 
 def test_old_gui_config_gets_switch_and_saved_toggle_controls_conversion(tmp_path):
@@ -231,7 +288,7 @@ def test_index_uses_saved_heading_styles_by_semantic_level(tmp_path, outline):
     output = tmp_path / 'styled.docx'
     Converter(config_data=saved).convert_string(markdown, str(output))
     doc = Document(output)
-    indexed = [doc.paragraphs[0], *doc.tables[0].cell(0, 0).paragraphs]
+    indexed = [doc.tables[0].cell(0, 0).paragraphs[0], *_entries(doc.tables[0])]
     for level, paragraph, font, size, alignment in zip((2, 3, 4), indexed, fonts, sizes, alignments):
         assert paragraph._p.xpath('.//w:rPr/w:rFonts/@w:eastAsia') == [font]
         assert paragraph._p.xpath('.//w:rPr/w:sz/@w:val') == [str(int(size * 2))]
@@ -245,7 +302,7 @@ def test_index_uses_saved_heading_styles_by_semantic_level(tmp_path, outline):
         assert paragraph._p.xpath('./w:pPr/w:outlineLvl/@w:val') == ['9']
     # Template/source styles are not modified when building the index.
     if not outline:
-        for source, index in zip(doc.paragraphs[1:], indexed):
+        for source, index in zip(doc.paragraphs, indexed):
             assert source.paragraph_format.first_line_indent == index.paragraph_format.first_line_indent
             assert source.paragraph_format.line_spacing == index.paragraph_format.line_spacing
 
@@ -342,13 +399,13 @@ def test_markdown_sections_do_not_turn_body_outline_titles_into_index_pages(
     output = tmp_path / 'result.docx'
     _converter(**kwargs).convert_string(markdown, str(output))
     result = Document(output)
-    index_titles = [p for p in result.paragraphs if p._p.xpath('./w:pPr/w:outlineLvl[@w:val="9"]')]
+    index_titles = [table.cell(0, 0).paragraphs[0] for table in result.tables]
     assert [p.text for p in index_titles] == ['1. 项目理解', '2. 服务安排']
     assert len(result.tables) == 2
-    assert [_text(p) for p in result.tables[0].cell(0, 0).paragraphs] == [
+    assert [_text(p) for p in _entries(result.tables[0])] == [
         '1.1 项目背景', '1.1.1 运行背景', '1.1.2 服务需求', '1.2 项目目标',
     ]
-    assert [_text(p) for p in result.tables[1].cell(0, 0).paragraphs] == ['2.1 实施计划']
+    assert [_text(p) for p in _entries(result.tables[1])] == ['2.1 实施计划']
     body = [p for p in result.paragraphs if not p._p.xpath('./w:pPr/w:outlineLvl[@w:val="9"]')]
     assert [p.text for p in body] == [p.text for p in baseline.paragraphs]
     # Index boundaries may start source H2 on a page. Every other source
