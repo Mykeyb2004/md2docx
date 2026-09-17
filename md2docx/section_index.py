@@ -3,11 +3,12 @@ from copy import deepcopy
 from typing import Any, Dict, Iterable, List, Tuple
 
 from docx.document import Document
-from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_ROW_HEIGHT_RULE, WD_TABLE_ALIGNMENT
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Emu, Pt, RGBColor
+from docx.table import Table
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
@@ -79,19 +80,20 @@ def _index_paragraph(
     return paragraph
 
 
-def _index_frame(doc: Document, heading: Paragraph):
-    """Create a double-bordered frame that can expand/split for long indexes."""
+def _index_frame(doc: Document, heading: Paragraph, row_count: int) -> Table:
+    """Fit a double-bordered frame to its content, allowing long indexes to split."""
     section = doc.sections[0]
     width = section.page_width - section.left_margin - section.right_margin
-    height = section.page_height - section.top_margin - section.bottom_margin
-    table = doc.add_table(rows=1, cols=1)
+    table = doc.add_table(rows=row_count, cols=1)
     table.style = 'Normal Table'
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table.autofit = False
+    table.autofit = True
+    # The grid follows the template's usable width; automatic preferred widths
+    # let Word shrink short indexes and wrap long entries within the margins.
     table.columns[0].width = Emu(width)
-    table.cell(0, 0).width = Emu(width)
-    table._tbl.tblPr.find(qn('w:tblW')).set(qn('w:w'), str(Emu(width).twips))
-    table._tbl.tblPr.find(qn('w:tblW')).set(qn('w:type'), 'dxa')
+    table_width = table._tbl.tblPr.find(qn('w:tblW'))
+    table_width.set(qn('w:w'), '0')
+    table_width.set(qn('w:type'), 'auto')
     borders = OxmlElement('w:tblBorders')
     for side in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
         border = OxmlElement(f'w:{side}')
@@ -103,29 +105,40 @@ def _index_frame(doc: Document, heading: Paragraph):
         borders, 'w:shd', 'w:tblLayout', 'w:tblCellMar', 'w:tblLook',
         'w:tblCaption', 'w:tblDescription', 'w:tblPrChange',
     )
-    row = table.rows[0]
-    row.height = Emu(int(height * 0.82))
-    row.height_rule = WD_ROW_HEIGHT_RULE.AT_LEAST
-    cell = row.cells[0]
-    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-    margins = OxmlElement('w:tcMar')
-    for side in ('top', 'left', 'bottom', 'right'):
-        margin = OxmlElement(f'w:{side}')
-        margin.set(qn('w:w'), '200')
-        margin.set(qn('w:type'), 'dxa')
-        margins.append(margin)
-    cell._tc.get_or_add_tcPr().insert_element_before(
-        margins, 'w:textDirection', 'w:tcFitText', 'w:vAlign',
-        'w:hideMark', 'w:headers', 'w:tcPrChange',
-    )
+    # Keep each title/entry intact, but let long indexes break between entries.
+    # One large entry row can be moved wholesale to the next page by Word.
+    for index, row in enumerate(table.rows):
+        row._tr.get_or_add_trPr().append(OxmlElement('w:cantSplit'))
+        cell = row.cells[0]
+        cell_width = cell._tc.get_or_add_tcPr().find(qn('w:tcW'))
+        cell_width.set(qn('w:w'), '0')
+        cell_width.set(qn('w:type'), 'auto')
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        margins = OxmlElement('w:tcMar')
+        for side in ('top', 'left', 'bottom', 'right'):
+            margin = OxmlElement(f'w:{side}')
+            # Only the outer edges need padding. Interior row spacing comes
+            # from the user's heading paragraph settings.
+            outer_edge = (
+                side in ('left', 'right')
+                or (side == 'top' and index == 0)
+                or (side == 'bottom' and index == row_count - 1)
+            )
+            margin.set(qn('w:w'), '200' if outer_edge else '0')
+            margin.set(qn('w:type'), 'dxa')
+            margins.append(margin)
+        cell._tc.get_or_add_tcPr().insert_element_before(
+            margins, 'w:textDirection', 'w:tcFitText', 'w:vAlign',
+            'w:hideMark', 'w:headers', 'w:tcPrChange',
+        )
     heading._p.addprevious(table._tbl)
-    return cell
+    return table
 
 
 def add_section_indexes(
     doc: Document, headings: Iterable[Heading], styles: StyleManager,
 ) -> None:
-    """Insert a standalone H2 title + H3/H4 index before each source H2.
+    """Insert a standalone index table with an H2 title row before each H2.
 
     H1/H2 close the preceding section. H5/H6 are excluded even when their
     renderer uses the Heading 4 style. Indexes may flow onto further pages.
@@ -156,13 +169,15 @@ def add_section_indexes(
 
     line_spacing = styles.get_document_style().get('line_spacing', 1.5)
     for heading, children in sections:
+        frame = _index_frame(doc, heading, row_count=len(children) + 1)
         title = _index_paragraph(
-            heading.insert_paragraph_before(), heading,
+            frame.cell(0, 0).paragraphs[0], heading,
             styles.get_heading_style(2), line_spacing,
         )
-        title.paragraph_format.page_break_before = title._p.getprevious() is not None
+        # A break on the first paragraph of the first row starts the whole
+        # table on a new page, without a separate title or spacer paragraph.
+        title.paragraph_format.page_break_before = frame._tbl.getprevious() is not None
         title.paragraph_format.keep_with_next = bool(children)
-        cell = _index_frame(doc, heading) if children else None
 
         for index, (level, child) in enumerate(children):
             name = f'_md2docx_index_{next_id}'
@@ -180,7 +195,7 @@ def add_section_indexes(
             next_id += 1
 
             entry = _index_paragraph(
-                cell.paragraphs[0] if index == 0 else cell.add_paragraph(),
+                frame.cell(index + 1, 0).paragraphs[0],
                 child, styles.get_heading_style(level), line_spacing,
             )
             if level == 3 and index + 1 < len(children) and children[index + 1][0] == 4:
