@@ -255,6 +255,7 @@ FIELD_LABELS: Dict[ConfigPath, str] = {
     ("document", "line_spacing"): "文档行距",
     ("document", "ignore_thematic_breaks"): "忽略分割线",
     ("document", "auto_fix_tables"): "自动修复表格",
+    ("document", "section_index"): "二级标题索引页",
     ("document", "outline_mode"): "大纲识别模式",
     ("metadata", "author"): "作者",
     ("metadata", "last_modified_by"): "最后修改者",
@@ -375,6 +376,7 @@ FIELD_TIPS: Dict[ConfigPath, str] = {
     ("document", "line_spacing"): "模板保留的文档级行距；正文、表格、列表请分别配置各自行距。",
     ("document", "ignore_thematic_breaks"): "控制是否忽略 Markdown 分割线 ---、*** 等。",
     ("document", "auto_fix_tables"): "控制是否尝试修复缺少 separator 行的不规范 Markdown 表格。",
+    ("document", "section_index"): "在每个二级标题前插入独立索引页，复用二、三、四级标题的字体、字号和段落排版。条目可点击跳转，不显示条目页码；没有下级标题时仅展示二级标题。主界面可直接开关并记住选择，模板页眉、页脚和页码规则保留。",
     ("document", "outline_mode"): "控制中文公文式大纲识别：auto 自动、on 强制开启、off 关闭。",
     ("metadata", "author"): "写入 Word 文档属性中的作者；为空时会尝试使用当前系统用户。",
     ("metadata", "last_modified_by"): "写入 Word 文档属性中的最后修改者；为空时使用作者。",
@@ -1651,9 +1653,22 @@ class Md2docxGUI:
             width=12,
         ).grid(row=3, column=3, padx=5, sticky=(tk.W, tk.E))
 
+        self.section_index_enabled = self.load_section_index_enabled()
+        self.section_index_var = tk.BooleanVar(value=self.section_index_enabled)
+        ttk.Checkbutton(
+            conv_frame,
+            text="插入二级标题索引页",
+            variable=self.section_index_var,
+            command=self.on_section_index_toggled,
+        ).grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
+        ttk.Label(
+            conv_frame,
+            text="样式沿用二～四级标题配置",
+        ).grid(row=4, column=2, columnspan=2, sticky=tk.W, padx=5)
+
         self.progress = ttk.Progressbar(conv_frame, mode="indeterminate", length=240)
         self.progress.grid(
-            row=4,
+            row=5,
             column=0,
             columnspan=3,
             padx=(0, 5),
@@ -1668,7 +1683,7 @@ class Md2docxGUI:
             style="Accent.TButton",
             width=12,
         ).grid(
-            row=4,
+            row=5,
             column=3,
             padx=5,
             pady=(15, 0),
@@ -1844,6 +1859,7 @@ class Md2docxGUI:
             return
 
         self.config_document = loaded_document
+        self.sync_section_index_from_config()
         self.config_file_var.set(self.describe_current_config())
         preference_saved = self.save_last_config_path(config_path)
         self.status_var.set(f"已打开配置：{config_path}")
@@ -1862,6 +1878,11 @@ class Md2docxGUI:
             self.config_editor.window.focus_force()
             return
 
+        if hasattr(self, "section_index_enabled"):
+            draft = clone_config(self.config_document.draft_config)
+            draft.setdefault("document", {})["section_index"] = self.section_index_enabled
+            self.config_document.update_draft(draft)
+
         self.config_editor = ConfigEditorWindow(
             self.root,
             document=self.config_document,
@@ -1872,6 +1893,7 @@ class Md2docxGUI:
 
     def on_config_saved(self, config_path: Path) -> None:
         """Handle successful config saves from the popup."""
+        self.sync_section_index_from_config()
         self.config_file_var.set(self.describe_current_config())
         preference_saved = self.save_last_config_path(config_path)
         self.status_var.set(f"已保存配置：{config_path}")
@@ -2017,6 +2039,8 @@ class Md2docxGUI:
         """Persist the last successfully opened or saved config path."""
         preferences = self.load_preferences()
         preferences["last_config_path"] = str(config_path.expanduser())
+        if hasattr(self, "section_index_enabled"):
+            preferences["section_index_enabled"] = self.section_index_enabled
         return self.save_preferences(preferences)
 
     def describe_current_config(self) -> str:
@@ -2026,8 +2050,40 @@ class Md2docxGUI:
         return str(self.config_document.current_path)
 
     def build_effective_conversion_config(self) -> Dict[str, Any]:
-        """Return an isolated copy of the last loaded or saved config."""
-        return clone_config(self.config_document.saved_config)
+        """Combine saved styles with the main-window switch without reading Tk."""
+        config = clone_config(self.config_document.saved_config)
+        if hasattr(self, "section_index_enabled"):
+            config.setdefault("document", {})["section_index"] = self.section_index_enabled
+        return config
+
+    def configured_section_index(self) -> bool:
+        """Read the switch from the saved configuration (default off)."""
+        document = getattr(self, "config_document", None)
+        config = document.saved_config if document is not None else {}
+        return bool(config.get("document", {}).get("section_index", False))
+
+    def load_section_index_enabled(self) -> bool:
+        """Restore the last main-window choice, falling back to YAML settings."""
+        value = self.load_preferences().get("section_index_enabled")
+        return value if isinstance(value, bool) else self.configured_section_index()
+
+    def sync_section_index_from_config(self) -> None:
+        """Make an explicitly opened or saved configuration authoritative."""
+        if hasattr(self, "section_index_var"):
+            self.section_index_enabled = self.configured_section_index()
+            self.section_index_var.set(self.section_index_enabled)
+
+    def on_section_index_toggled(self) -> None:
+        """Apply and remember the switch without rewriting the user's YAML."""
+        self.section_index_enabled = self.section_index_var.get()
+        preferences = self.load_preferences()
+        preferences["section_index_enabled"] = self.section_index_enabled
+        if not self.save_preferences(preferences):
+            messagebox.showwarning(
+                "偏好保存失败",
+                "索引页开关已生效，但无法记录供下次使用。",
+                parent=self.dialog_parent(),
+            )
 
     def selected_word_template(self) -> str:
         """Return the selected template only when template use is enabled."""

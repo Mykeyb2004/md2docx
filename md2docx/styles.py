@@ -19,6 +19,7 @@ class StyleManager:
             "line_spacing": 1.5,
             "ignore_thematic_breaks": True,
             "auto_fix_tables": False,
+            "section_index": False,
         },
         "heading1": {
             "font_name": "微软雅黑",

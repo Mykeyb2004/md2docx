@@ -20,6 +20,7 @@ from md2docx.styles import StyleManager
 from md2docx.parser import MarkdownParser
 from md2docx.mermaid_converter import MermaidReport
 from md2docx.omml_converter import FormulaReport
+from md2docx.section_index import add_section_indexes
 
 
 EXTENDED_PROPERTIES_NS = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
@@ -160,6 +161,16 @@ class Converter:
         # Parse Markdown and add content to document
         self.parser.parse(md_content, doc, base_dir=base_dir)
         self._apply_core_properties(doc, md_content)
+        if doc_style.get('section_index', False):
+            renderer = self.parser.renderer
+            # Prefer explicit Markdown chapters over Chinese body subheadings.
+            # A lone H1 document title still permits an outline-only document.
+            headings = (
+                renderer.markdown_headings
+                if any(level >= 2 for level, _ in renderer.markdown_headings)
+                else renderer.headings
+            )
+            add_section_indexes(doc, headings, self.style_manager)
         
         return doc
 
