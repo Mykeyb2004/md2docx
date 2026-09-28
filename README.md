@@ -6,7 +6,8 @@
 
 ## 功能概览
 
-- CLI 支持单文件转换和目录递归批量转换。
+- CLI 支持 Markdown/PDF 单文件转换和目录递归批量转换。
+- PDF 文本由 MarkItDown 提取为 Markdown 后进入同一套 DOCX 渲染流程（PDF 支持需要 Python 3.10+）。
 - GUI 支持文件选择、进度与历史记录、配置文件打开和保存。
 - YAML 可配置页面、页边距、元数据、标题、段落、代码、列表、表格、数学公式、Mermaid 和章节扫描。
 - 支持本地 Markdown 图片；相对路径以 Markdown 文件所在目录为基准解析。
@@ -17,6 +18,8 @@
 - 主界面可开关二级标题索引页：列出本节三级、四级标题，复用对应标题配置，条目可跳转且不显示页码；模板页眉页脚保留。
 
 ## 支持的 Markdown
+
+除 Markdown 外，CLI 和 GUI 也支持输入 PDF 文件。PDF 会先由 MarkItDown 提取文本和基础结构，再按 Markdown 规则生成可编辑的 Word 文档。
 
 | 语法 | 状态 | 说明 |
 | --- | --- | --- |
@@ -60,13 +63,16 @@ uv sync
 # 输出到与输入文件同名的 .docx
 uv run md2docx input.md
 
+# 转换 PDF（需要 Python 3.10+）
+uv run md2docx input.pdf
+
 # 指定输出文件
 uv run md2docx input.md --output-file output.docx
 
 # 输出到目录
 uv run md2docx input.md --output-dir output
 
-# 递归转换目录内全部 Markdown 文件
+# 递归转换目录内全部 Markdown 和 PDF 文件
 uv run md2docx docs --output-dir output
 
 # 覆盖已有输出
@@ -82,7 +88,7 @@ uv run md2docx input.md --word-template letterhead.docx --output-file output.doc
 uv run md2docx --help
 ```
 
-目录输入必须指定 `--output-dir`。目录中的 Markdown 文件会递归转换到该输出目录；请避免不同子目录中出现同名文件。
+目录输入必须指定 `--output-dir`。目录中的 Markdown 和 PDF 文件会递归转换到该输出目录；请避免不同子目录中出现同名文件。
 
 从任意目录调用项目：
 
@@ -117,7 +123,7 @@ GUI 提供单文件转换、进度显示、历史记录和配置文件工作流�
 ```python
 from md2docx import Converter
 
-# 转换 Markdown 文件；相对图片路径会按 input.md 所在目录解析
+# 转换 Markdown 或 PDF 文件；相对图片路径会按输入文件所在目录解析
 converter = Converter(style_config="my_styles.yaml")
 converter.convert("input.md", "output.docx")
 

@@ -1558,7 +1558,7 @@ class Md2docxGUI:
         conv_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         conv_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(conv_frame, text="Markdown 文件：").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(conv_frame, text="Markdown/PDF 文件：").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.input_var = tk.StringVar()
         input_entry = ttk.Entry(conv_frame, textvariable=self.input_var, width=50)
         input_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5)
@@ -1747,12 +1747,13 @@ class Md2docxGUI:
         return getattr(self, "root", None)
 
     def browse_input_file(self) -> None:
-        """Open file dialog to select input Markdown file."""
+        """Open file dialog to select an input Markdown or PDF file."""
         filename = filedialog.askopenfilename(
             parent=self.dialog_parent(),
-            title="选择 Markdown 文件",
+            title="选择 Markdown 或 PDF 文件",
             filetypes=[
                 ("Markdown files", "*.md"),
+                ("PDF files", "*.pdf"),
                 ("Text files", "*.txt"),
                 ("All files", "*.*"),
             ],
@@ -2095,7 +2096,7 @@ class Md2docxGUI:
         return template_variable.get().strip() if template_variable is not None else ""
 
     def convert_file(self) -> None:
-        """Convert Markdown file to Word document."""
+        """Convert a Markdown or PDF file to a Word document."""
         input_file = self.input_var.get()
         output_file = self.output_var.get()
         word_template_file = self.selected_word_template()
@@ -2103,7 +2104,7 @@ class Md2docxGUI:
         if not input_file:
             messagebox.showerror(
                 "错误",
-                "请选择输入 Markdown 文件。",
+                "请选择输入 Markdown 或 PDF 文件。",
                 parent=self.dialog_parent(),
             )
             return

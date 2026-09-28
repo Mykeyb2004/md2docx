@@ -8,10 +8,17 @@ from pathlib import Path
 from md2docx import Converter
 
 
+SUPPORTED_INPUT_SUFFIXES = frozenset({".md", ".pdf"})
+
+
 def _iter_markdown_files(root: Path) -> list[Path]:
-    """Return Markdown files under a directory in deterministic order."""
+    """Return supported Markdown and PDF files under a directory."""
     return sorted(
-        (path for path in root.rglob("*.md") if path.is_file()),
+        (
+            path
+            for path in root.rglob("*")
+            if path.is_file() and path.suffix.lower() in SUPPORTED_INPUT_SUFFIXES
+        ),
         key=lambda path: path.relative_to(root).as_posix(),
     )
 
@@ -68,12 +75,12 @@ def main() -> None:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         prog='md2docx',
-        description='Convert Markdown files to Word documents with precise style control',
+        description='Convert Markdown and PDF files to Word documents with precise style control',
         epilog='Examples:\n'
                '  md2docx input.md                    # Convert to input.docx\n'
                '  md2docx input.md --output-file output.docx  # Specify output file\n'
                '  md2docx input.md --output-dir out   # Save into a directory\n'
-               '  md2docx docs --output-dir out       # Recursively convert all .md files\n'
+               '  md2docx docs --output-dir out       # Recursively convert .md and .pdf files\n'
                '  md2docx input.md -t chinese_academic  # Use template\n'
                '  md2docx input.md -s custom.yaml     # Use custom styles\n'
                '  md2docx input.md --word-template letterhead.docx  # Preserve Word header/footer',
@@ -83,7 +90,7 @@ def main() -> None:
     parser.add_argument(
         'input',
         type=str,
-        help='Input Markdown file path'
+        help='Input Markdown or PDF file path'
     )
     
     parser.add_argument(
@@ -182,7 +189,7 @@ def main() -> None:
         if input_path.is_dir():
             markdown_files = _iter_markdown_files(input_path)
             if not markdown_files:
-                print(f"Error: No Markdown files found under {args.input}", file=sys.stderr)
+                print(f"Error: No Markdown or PDF files found under {args.input}", file=sys.stderr)
                 sys.exit(1)
 
             output_dir = Path(args.output_dir)
