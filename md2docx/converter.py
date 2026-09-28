@@ -15,6 +15,11 @@ import xml.etree.ElementTree as ET
 from docx import Document
 from docx.oxml.ns import qn
 
+try:
+    from markitdown import MarkItDown
+except ImportError:  # pragma: no cover - only reachable on Python < 3.10
+    MarkItDown = None  # type: ignore[assignment,misc]
+
 from md2docx.config_utils import clone_config, merge_config
 from md2docx.styles import StyleManager
 from md2docx.parser import MarkdownParser
@@ -24,6 +29,20 @@ from md2docx.section_index import add_section_indexes
 
 
 EXTENDED_PROPERTIES_NS = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
+
+
+def _extract_pdf_markdown(pdf_path: Path) -> str:
+    """Extract Markdown text from a PDF with MarkItDown."""
+    if MarkItDown is None:
+        raise RuntimeError(
+            "PDF conversion requires markitdown; install md2docx on Python 3.10 or newer."
+        )
+
+    result = MarkItDown().convert(str(pdf_path))
+    markdown = result.text_content
+    if not markdown.strip():
+        raise ValueError(f"MarkItDown extracted no text from PDF: {pdf_path}")
+    return markdown
 
 
 class Converter:
@@ -85,10 +104,10 @@ class Converter:
     
     def convert(self, md_path: str, docx_path: str) -> None:
         """
-        Convert Markdown file to Word document.
+        Convert a Markdown or PDF file to a Word document.
         
         Args:
-            md_path: Path to input Markdown file
+            md_path: Path to input Markdown or PDF file
             docx_path: Path to output Word document
             
         Raises:
@@ -99,10 +118,12 @@ class Converter:
         
         if not md_file.exists():
             raise FileNotFoundError(f"Markdown file not found: {md_path}")
-        
-        # Read Markdown content
-        with open(md_file, 'r', encoding='utf-8') as f:
-            md_content = f.read()
+
+        if md_file.suffix.lower() == ".pdf":
+            md_content = _extract_pdf_markdown(md_file)
+        else:
+            with open(md_file, 'r', encoding='utf-8') as f:
+                md_content = f.read()
         
         # Convert to Word
         self.convert_string(md_content, docx_path, base_dir=md_file.parent)

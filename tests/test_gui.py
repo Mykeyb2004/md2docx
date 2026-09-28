@@ -842,7 +842,7 @@ def test_main_window_buttons_use_chinese_labels(monkeypatch):
         "转换为 Word",
     ]
     assert [widget.kwargs["text"] for widget in labels] == [
-        "Markdown 文件：",
+        "Markdown/PDF 文件：",
         "输出文件：",
         "当前配置：",
         "样式沿用二～四级标题配置",

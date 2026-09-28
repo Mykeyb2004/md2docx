@@ -6,7 +6,19 @@ from pathlib import Path
 
 from docx import Document
 
-from md2docx.cli import main
+from md2docx.cli import _iter_markdown_files, main
+
+
+def test_directory_input_includes_pdf_files(tmp_path):
+    """Directory mode should discover Markdown and PDF inputs."""
+    (tmp_path / "report.md").write_text("# Markdown\n", encoding="utf-8")
+    (tmp_path / "appendix.PDF").write_bytes(b"%PDF-1.7")
+    (tmp_path / "ignored.txt").write_text("ignore", encoding="utf-8")
+
+    assert [path.name for path in _iter_markdown_files(tmp_path)] == [
+        "appendix.PDF",
+        "report.md",
+    ]
 
 
 def test_output_dir_saves_docx_with_input_stem(tmp_path, monkeypatch):
