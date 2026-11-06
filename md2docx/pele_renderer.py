@@ -27,7 +27,7 @@ try:
 except ImportError:
     resvg_py = None  # type: ignore[assignment]
 
-PELE_RENDERER_VERSION = "1.13.0"
+PELE_RENDERER_VERSION = "1.13.1"
 
 # CJK and common font discovery candidates
 _FONT_CANDIDATES: List[str] = [
@@ -456,6 +456,21 @@ class PeleRenderer:
             return tag
 
         svg = re.sub(r"<rect\b[^>]*>", fix_rect_rx, svg)
+
+        # 5. Strip all CSS custom properties (--name: value;) from style attributes
+        # resvg's CSS parser does not support CSS custom property declarations in inline style="..."
+        # and silently drops the entire style attribute (including critical root font and font-family).
+        def clean_style_vars(m: re.Match[str]) -> str:
+            s = m.group(1)
+            s = re.sub(r"--[a-zA-Z0-9_-]+\s*:[^;]+;?", "", s)
+            s = s.strip("; ")
+            return f'style="{s}"' if s else ""
+
+        svg = re.sub(r'style="([^"]*)"', clean_style_vars, svg)
+
+        # 6. Ensure root <svg> has explicit font-family attribute as defense-in-depth for resvg font resolution
+        if 'font-family=' not in svg[:300]:
+            svg = re.sub(r"<svg\b", f'<svg font-family="{self.font_family}"', svg, count=1)
 
         return svg
 

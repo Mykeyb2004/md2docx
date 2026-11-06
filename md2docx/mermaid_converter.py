@@ -257,9 +257,12 @@ class MermaidConverter:
 
     def _get_cached_image(self, key: str) -> Optional[bytes]:
         """Get a cached diagram image if present."""
-        cache_file = self.cache_dir / f"{key}.{self.output_format}"
-        if cache_file.exists():
-            return cache_file.read_bytes()
+        try:
+            cache_file = self.cache_dir / f"{key}.{self.output_format}"
+            if cache_file.exists():
+                return cache_file.read_bytes()
+        except OSError:
+            pass
         return None
 
     def _cache_image(self, key: str, img_bytes: bytes) -> None:
