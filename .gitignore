@@ -1,4 +1,5 @@
 # 测试文件
+/tests/
 test_*.md
 test_*.docx
 
