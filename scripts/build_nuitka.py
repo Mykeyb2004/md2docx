@@ -136,6 +136,8 @@ def build_nuitka_command(entry: str, mode: str) -> list:
             "--assume-yes-for-downloads",
             "--include-package-data=md2docx",
             "--include-package=mistune.plugins",
+            "--include-package=resvg_py",
+            "--include-package=quickjs",
             f"--output-dir={OUTPUT_DIR}",
             f"--output-filename={binary_name}",
             str(source_file),
@@ -363,6 +365,13 @@ def verify_macos_app(app_path: Path) -> Path:
     )
     if not packaged_template:
         raise RuntimeError("bundle is missing packaged md2docx template")
+    packaged_pele = any(
+        path.is_file()
+        and tuple(path.parts[-4:]) == ("md2docx", "vendor", "pele", "pele.global.js")
+        for path in app_path.rglob("pele.global.js")
+    )
+    if not packaged_pele:
+        raise RuntimeError("bundle is missing packaged pele.global.js bundle")
     has_tcl = any(
         path.is_file() and path.parent.name.startswith("tcl")
         for path in app_path.rglob("init.tcl")

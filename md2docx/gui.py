@@ -141,6 +141,10 @@ COLUMN_WIDTH_STRATEGY_VALUE_MAPPING = (
     ("按内容分配", "content-weighted"),
     ("均衡分配", "balanced"),
 )
+MERMAID_ENGINE_VALUE_MAPPING = (
+    ("内置极速引擎 (Pele)", "pele"),
+    ("外部 Mermaid CLI (mmdc)", "mmdc"),
+)
 MERMAID_FORMAT_VALUE_MAPPING = (
     ("PNG 图片", "png"),
     ("SVG 矢量图", "svg"),
@@ -172,6 +176,7 @@ READONLY_FIELD_VALUE_MAPPINGS: Dict[ConfigPath, Tuple[Tuple[str, str], ...]] = {
     ("table", "header_vertical_alignment"): VERTICAL_ALIGNMENT_VALUE_MAPPING,
     ("table", "column_width_strategy"): COLUMN_WIDTH_STRATEGY_VALUE_MAPPING,
     ("math_block", "alignment"): IMAGE_ALIGNMENT_VALUE_MAPPING,
+    ("mermaid", "engine"): MERMAID_ENGINE_VALUE_MAPPING,
     ("mermaid", "format"): MERMAID_FORMAT_VALUE_MAPPING,
     ("mermaid", "theme"): MERMAID_THEME_VALUE_MAPPING,
     ("mermaid", "alignment"): IMAGE_ALIGNMENT_VALUE_MAPPING,
@@ -191,6 +196,7 @@ LEGACY_FIELD_OPTIONS: Dict[ConfigPath, Tuple[str, ...]] = {
     ("table", "alignment"): HORIZONTAL_ALIGNMENT_OPTIONS,
     ("table", "header_alignment"): HEADER_ALIGNMENT_OPTIONS,
     ("table", "header_vertical_alignment"): VERTICAL_ALIGNMENT_OPTIONS,
+    ("mermaid", "engine"): ("pele", "mmdc"),
     ("mermaid", "format"): ("png", "svg", "pdf"),
     ("mermaid", "theme"): ("default", "base", "dark", "forest", "neutral"),
     ("mermaid", "alignment"): IMAGE_ALIGNMENT_OPTIONS,
@@ -312,7 +318,9 @@ FIELD_LABELS: Dict[ConfigPath, str] = {
     ("math_block", "space_before"): "公式段前间距",
     ("math_block", "space_after"): "公式段后间距",
     ("math_block", "dpi"): "块级公式分辨率",
+    ("mermaid", "engine"): "渲染引擎",
     ("mermaid", "command"): "Mermaid 命令",
+    ("mermaid", "scale"): "渲染缩放比",
     ("mermaid", "format"): "输出格式",
     ("mermaid", "theme"): "主题",
     ("mermaid", "width"): "图片宽度",
@@ -434,7 +442,9 @@ FIELD_TIPS: Dict[ConfigPath, str] = {
     ("math_block", "space_before"): "设置块级公式段前间距。",
     ("math_block", "space_after"): "设置块级公式段后间距。",
     ("math_block", "dpi"): "块级公式图片回退分辨率字段；当前行为等同默认值。",
-    ("mermaid", "command"): "设置 Mermaid CLI 命令或可执行文件路径。",
+    ("mermaid", "engine"): "设置 Mermaid 渲染引擎；默认内置极速引擎 (Pele)，无需 Node.js。",
+    ("mermaid", "command"): "设置 Mermaid CLI 命令或可执行文件路径（仅在引擎为 mmdc 时生效）。",
+    ("mermaid", "scale"): "设置 Mermaid 渲染清晰度缩放倍数，默认 1.0。",
     ("mermaid", "format"): "设置 Mermaid 转换输出格式；插入 Word 最稳妥的是 PNG。",
     ("mermaid", "theme"): "设置 Mermaid 内置主题；使用主题变量时建议 base。",
     ("mermaid", "width"): "设置 Mermaid 图首选宽度，最终不会超过页面可用宽度。",
