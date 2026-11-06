@@ -8,6 +8,7 @@ matplotlib.use('Agg')  # Non-GUI backend
 import matplotlib.pyplot as plt
 from pathlib import Path
 import hashlib
+import tempfile
 from typing import Optional
 
 
@@ -24,9 +25,21 @@ class MathConverter:
         """
         self.dpi = dpi
         if cache_dir is None:
-            cache_dir = Path.home() / '.md2docx' / 'math_cache'
+            default_cache = Path.home() / '.md2docx' / 'math_cache'
+            try:
+                default_cache.mkdir(parents=True, exist_ok=True)
+                cache_dir = default_cache
+            except OSError:
+                cache_dir = Path(tempfile.gettempdir()) / 'md2docx_math_cache'
+                try:
+                    cache_dir.mkdir(parents=True, exist_ok=True)
+                except OSError:
+                    pass
         self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
     
     def latex_to_image(self, latex: str, inline: bool = False) -> bytes:
         """
@@ -106,15 +119,21 @@ class MathConverter:
     
     def _get_cached_image(self, key: str) -> Optional[bytes]:
         """Get cached image if exists."""
-        cache_file = self.cache_dir / f"{key}.png"
-        if cache_file.exists():
-            return cache_file.read_bytes()
+        try:
+            cache_file = self.cache_dir / f"{key}.png"
+            if cache_file.exists():
+                return cache_file.read_bytes()
+        except OSError:
+            pass
         return None
     
-    def _cache_image(self, key: str, img_bytes: bytes):
+    def _cache_image(self, key: str, img_bytes: bytes) -> None:
         """Cache rendered image."""
-        cache_file = self.cache_dir / f"{key}.png"
-        cache_file.write_bytes(img_bytes)
+        try:
+            cache_file = self.cache_dir / f"{key}.png"
+            cache_file.write_bytes(img_bytes)
+        except OSError:
+            pass
     
     def clear_cache(self):
         """Clear all cached formula images."""
