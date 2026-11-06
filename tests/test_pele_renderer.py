@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 import io
+import re
 import pytest
 from PIL import Image
 
@@ -184,3 +185,60 @@ class TestPeleErrorHandling:
         renderer = PeleRenderer()
         with pytest.raises(ValueError):
             renderer.render_png("   \n  ")
+
+
+class TestPeleCjkAndEdgeLabels:
+    """Tests CJK glyph resolution and edge label text rendering in resvg."""
+
+    def test_cjk_characters_and_edge_labels_rendered_correctly(self) -> None:
+        renderer = PeleRenderer()
+        code = (
+            "flowchart TD\n"
+            "A[确定岗位类别] --> B[编制培训计划]\n"
+            "B --> C[政策授课]\n"
+            "B --> D[系统实操]\n"
+            "B --> E[信息处理训练]\n"
+            "C --> F[集中答疑]\n"
+            "D --> F\n"
+            "E --> F\n"
+            "F --> G[理论与实操考核]\n"
+            "G --> H{是否达标}\n"
+            "H -- 是 --> I[审批上岗]\n"
+            "H -- 否 --> J[补训补考]\n"
+            "J --> G\n"
+        )
+        theme_vars = {
+            "primaryColor": "#E8F1FF",
+            "primaryTextColor": "#163A70",
+            "primaryBorderColor": "#7EA6FF",
+            "lineColor": "#2F6BFF",
+            "secondaryColor": "#2F6BFF",
+            "clusterBkg": "#D4E5FF",
+            "edgeLabelBackground": "#E8F1FF",
+        }
+
+        # 1. Verify SVG does not leak CSS custom property declarations inside style="..."
+        svg = renderer.render_svg(code, theme="base", theme_variables=theme_vars)
+        assert not re.search(r'style="[^"]*--[a-zA-Z0-9_-]+\s*:', svg), (
+            "SVG style attribute must not contain CSS custom property declarations"
+        )
+        assert 'font-family="' in svg[:300], "SVG root must have font-family attribute"
+
+        # 2. Verify rendered PNG has visible glyphs for node F and edge labels
+        png_bytes = renderer.render_png(code, theme="base", theme_variables=theme_vars)
+        with Image.open(io.BytesIO(png_bytes)) as img:
+            # Node F center (集中答疑) around x=198, y=320
+            crop_f = img.crop((198 - 20, 320 - 8, 198 + 20, 320 + 8))
+            f_colors = len(set(crop_f.getdata()))
+            assert f_colors > 10, f"Node F text '集中答疑' was not rendered (only {f_colors} color)"
+
+            # Edge label '是' around x=124, y=607
+            crop_shi = img.crop((124 - 8, 607 - 8, 124 + 8, 607 + 8))
+            shi_colors = len(set(crop_shi.getdata()))
+            assert shi_colors > 10, f"Edge label '是' was not rendered (only {shi_colors} color)"
+
+            # Edge label '否' around x=251, y=607
+            crop_fou = img.crop((251 - 8, 607 - 8, 251 + 8, 607 + 8))
+            fou_colors = len(set(crop_fou.getdata()))
+            assert fou_colors > 10, f"Edge label '否' was not rendered (only {fou_colors} color)"
+
