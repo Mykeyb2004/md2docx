@@ -153,10 +153,12 @@ math_block:
   space_after: 6pt
   dpi: 300        # 渲染分辨率
 
-# Mermaid diagram style (rendered via Mermaid CLI)
+# Mermaid diagram style (rendered via built-in Pele or external Mermaid CLI)
 mermaid:
+  engine: pele
   command: mmdc
   format: png
+  scale: 1.0
   theme: base
   width: 5.5in
   alignment: center

@@ -34,12 +34,13 @@ def _install_fake_mermaid_cli(monkeypatch, captured):
 
 
 def test_mermaid_converter_passes_theme_flag_without_custom_variables(monkeypatch, tmp_path):
-    """Theme-only config should keep using Mermaid CLI's built-in theme flag."""
+    """Theme-only config should keep using Mermaid CLI's built-in theme flag when using mmdc engine."""
     captured = {}
     _install_fake_mermaid_cli(monkeypatch, captured)
 
     converter = MermaidConverter(
         cache_dir=tmp_path,
+        engine="mmdc",
         command="mmdc",
         theme="forest",
         background_color="transparent",
@@ -55,12 +56,13 @@ def test_mermaid_converter_passes_theme_flag_without_custom_variables(monkeypatc
 
 
 def test_mermaid_converter_uses_config_file_for_theme_variables(monkeypatch, tmp_path):
-    """Theme variables should be passed to Mermaid CLI via a generated config file."""
+    """Theme variables should be passed to Mermaid CLI via a generated config file when using mmdc engine."""
     captured = {}
     _install_fake_mermaid_cli(monkeypatch, captured)
 
     converter = MermaidConverter(
         cache_dir=tmp_path,
+        engine="mmdc",
         command="mmdc",
         theme_variables={
             "primaryColor": "#E8F1FF",
@@ -83,12 +85,13 @@ def test_mermaid_converter_uses_config_file_for_theme_variables(monkeypatch, tmp
 
 
 def test_mermaid_converter_forces_base_theme_when_theme_variables_are_present(monkeypatch, tmp_path):
-    """Custom theme variables should force Mermaid's base theme so colors actually apply."""
+    """Custom theme variables should force Mermaid's base theme so colors actually apply when using mmdc engine."""
     captured = {}
     _install_fake_mermaid_cli(monkeypatch, captured)
 
     converter = MermaidConverter(
         cache_dir=tmp_path,
+        engine="mmdc",
         command="mmdc",
         theme="default",
         theme_variables={
@@ -100,6 +103,16 @@ def test_mermaid_converter_forces_base_theme_when_theme_variables_are_present(mo
     converter._render_diagram("graph TD\nA-->B")
 
     assert captured["config"]["theme"] == "base"
+
+
+def test_mermaid_converter_defaults_to_pele_engine(tmp_path):
+    """MermaidConverter should default to the built-in Pele engine with scale=1.0."""
+    converter = MermaidConverter(cache_dir=tmp_path)
+    assert converter.engine == "pele"
+    assert converter.scale == 1.0
+    assert converter.is_available() is True
+    png = converter.mermaid_to_image("flowchart LR\n  A[默认内置引擎] --> B[完成]")
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_mermaid_cache_key_includes_theme_variables():

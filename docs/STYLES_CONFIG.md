@@ -387,9 +387,11 @@ list:
 
 ```yaml
 mermaid:
+  engine: pele
   command: mmdc
   format: png
-  theme: default
+  scale: 1.0
+  theme: base
   width: 5.5in
   alignment: center
   space_before: 6pt
@@ -422,8 +424,10 @@ mermaid:
 
 | 参数 | 类型 | 默认值 | 说明 |
 |:-----|:----:|:-------|:-----|
-| `command` | 字符串 | `mmdc` | Mermaid CLI 命令名或路径 |
-| `format` | 字符串 | `png` | 输出图片格式 |
+| `engine` | 字符串 | `pele` | 渲染引擎，可选 `pele`（默认内置极速引擎，无需 Node.js/Chromium，渲染提速数十倍）或 `mmdc`（外部 Mermaid CLI） |
+| `command` | 字符串 | `mmdc` | Mermaid CLI 命令名或路径（仅在 `engine: mmdc` 时使用） |
+| `format` | 字符串 | `png` | 输出图片格式（Word 中推荐 PNG） |
+| `scale` | 数字 | `1.0` | 图片渲染缩放倍数，控制图片清晰度 |
 | `theme` | 字符串 | `default` | Mermaid 内置主题，如 `default`、`dark`、`forest`、`neutral`、`base` |
 | `width` | 字符串 | `5.5in` | Mermaid 图片的首选宽度 |
 | `alignment` | 字符串 | `center` | 图片段落对齐方式，建议保持居中 |

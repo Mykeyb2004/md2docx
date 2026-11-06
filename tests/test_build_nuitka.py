@@ -49,6 +49,8 @@ def test_app_command_creates_bundle_without_onefile():
     assert "--output-folder-name=Md2docx" in command
     assert "--output-filename=md2docx-app" in command
     assert "--enable-plugin=tk-inter" in command
+    assert "--include-package=resvg_py" in command
+    assert "--include-package=quickjs" in command
     assert "--mode=onefile" not in command
     assert "--mode=app" not in command
 
@@ -283,6 +285,10 @@ def make_fake_app(root: Path) -> Path:
     (resources / "md2docx" / "templates" / "default.yaml").write_text(
         "paragraph: {}\n", encoding="utf-8"
     )
+    (resources / "md2docx" / "vendor" / "pele").mkdir(parents=True)
+    (resources / "md2docx" / "vendor" / "pele" / "pele.global.js").write_text(
+        "var pele = {};\n", encoding="utf-8"
+    )
     (resources / "tcl8.6").mkdir()
     (resources / "tcl8.6" / "init.tcl").write_text("# tcl\n", encoding="utf-8")
     (resources / "tk8.6").mkdir()
@@ -397,6 +403,21 @@ def test_verify_macos_app_rejects_missing_packaged_template(tmp_path, monkeypatc
     )
 
     with pytest.raises(RuntimeError, match="packaged md2docx template"):
+        build_nuitka.verify_macos_app(app_path)
+
+
+def test_verify_macos_app_rejects_missing_pele_bundle(tmp_path, monkeypatch):
+    app_path = make_fake_app(tmp_path)
+    (app_path / "Contents" / "Resources" / "md2docx" / "vendor" / "pele" / "pele.global.js").unlink()
+    monkeypatch.setattr(
+        build_nuitka.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 0, "Mach-O 64-bit executable arm64\n", ""
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="packaged pele.global.js bundle"):
         build_nuitka.verify_macos_app(app_path)
 
 
