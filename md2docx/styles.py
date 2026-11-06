@@ -65,8 +65,10 @@ class StyleManager:
             "ordered_list_as_text": False,
         },
         "mermaid": {
+            "engine": "pele",
             "command": "mmdc",
             "format": "png",
+            "scale": 1.0,
             "theme": "default",
             "width": "5.5in",
             "alignment": "center",

@@ -73,12 +73,13 @@ class DocxRenderer(mistune.BaseRenderer):
         self.mermaid_report = MermaidReport()
         mermaid_style = self.styles.get_mermaid_style()
         self.mermaid_converter = MermaidConverter(
+            engine=mermaid_style.get('engine', 'pele'),
             command=mermaid_style.get('command', 'mmdc'),
             output_format=mermaid_style.get('format', 'png'),
             theme=mermaid_style.get('theme'),
             theme_variables=mermaid_style.get('theme_variables'),
             background_color=mermaid_style.get('background_color', 'white'),
-            scale=mermaid_style.get('scale'),
+            scale=mermaid_style.get('scale', 1.0),
         )
         # Numbering is initialized lazily because a valid Word template may not
         # contain a numbering part at all (for example, a header-only template).

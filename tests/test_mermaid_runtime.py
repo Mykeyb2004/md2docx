@@ -63,8 +63,28 @@ def test_finder_conversion_finds_mmdc_and_its_node(finder_runtime, tmp_path, abs
 
 
 def test_missing_explicit_command_does_not_use_another_mmdc(finder_runtime, tmp_path):
-    converter = MermaidConverter(cache_dir=tmp_path / 'cache', command=str(tmp_path / 'missing/mmdc'))
+    converter = MermaidConverter(
+        cache_dir=tmp_path / 'cache',
+        engine='mmdc',
+        command=str(tmp_path / 'missing/mmdc'),
+    )
     assert not converter.is_available()
+
+
+def test_clean_path_without_node_or_mmdc_succeeds_with_default_pele(monkeypatch, tmp_path):
+    """Clean PATH (/usr/bin:/bin) with no Node.js or mmdc works cleanly with built-in Pele engine."""
+    monkeypatch.setattr(Path, 'home', classmethod(lambda cls: tmp_path))
+    monkeypatch.setenv('PATH', '/usr/bin:/bin')
+    monkeypatch.delenv('NVM_BIN', raising=False)
+    monkeypatch.delenv('NVM_DIR', raising=False)
+    converter = Converter()
+    output = tmp_path / 'pele_clean_path.docx'
+    converter.convert_string('```mermaid\nflowchart LR\n  A[零Node环境] --> B[渲染成功]\n```', str(output))
+
+    doc = Document(output)
+    assert len(doc.inline_shapes) == 1
+    assert converter.mermaid_report.total == 1
+    assert converter.mermaid_report.succeeded == 1
 
 
 @pytest.fixture
